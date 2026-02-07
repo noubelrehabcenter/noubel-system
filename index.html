@@ -537,6 +537,64 @@
             color: white;
         }
 
+        /* Pagination */
+        .pagination-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            background: white;
+            border-top: 2px solid var(--border);
+            border-radius: 0 0 12px 12px;
+            margin-top: -1px;
+        }
+
+        .pagination-info {
+            color: var(--text-light);
+            font-size: 0.9rem;
+        }
+
+        .pagination-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .pagination-btn {
+            min-width: 100px;
+        }
+
+        .pagination-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .page-numbers {
+            display: flex;
+            gap: 5px;
+        }
+
+        .page-number {
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: white;
+            color: var(--text);
+            font-size: 0.9rem;
+        }
+
+        .page-number:hover {
+            background: var(--bg);
+        }
+
+        .page-number.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
         /* Modal */
         .modal {
             display: none;
@@ -685,9 +743,110 @@
             border-radius: 8px;
             margin: 15px 0;
         }
+
+        /* Toast Notifications */
+        .toast-container {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            z-index: 10000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .toast {
+            background: white;
+            padding: 16px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            min-width: 300px;
+            max-width: 400px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            animation: slideIn 0.3s ease;
+            border-left: 4px solid;
+        }
+
+        .toast.success {
+            border-left-color: var(--success);
+        }
+
+        .toast.error {
+            border-left-color: var(--danger);
+        }
+
+        .toast.warning {
+            border-left-color: var(--warning);
+        }
+
+        .toast.info {
+            border-left-color: var(--primary);
+        }
+
+        .toast-icon {
+            font-size: 20px;
+            flex-shrink: 0;
+        }
+
+        .toast-message {
+            flex: 1;
+            font-size: 0.95rem;
+            color: var(--text);
+        }
+
+        .toast-close {
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            color: var(--text-light);
+            padding: 0;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+
+        .toast-close:hover {
+            background: var(--bg);
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideOut {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+        }
+
+        .toast.removing {
+            animation: slideOut 0.3s ease forwards;
+        }
     </style>
 </head>
 <body>
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
     <!-- Loading Overlay -->
     <div class="loading-overlay" id="loadingOverlay">
         <div class="spinner"></div>
@@ -783,6 +942,10 @@
                     <div class="stat-label">Active Patients</div>
                     <div class="stat-value" id="activePatients">0</div>
                 </div>
+                <div class="stat-card">
+                    <div class="stat-label">Completed Patients</div>
+                    <div class="stat-value" id="completedPatients">0</div>
+                </div>
                 <div class="stat-card" data-permission="viewRevenue">
                     <div class="stat-label">Total Revenue</div>
                     <div class="stat-value" id="totalRevenue">0 AED</div>
@@ -790,6 +953,10 @@
                 <div class="stat-card">
                     <div class="stat-label">Sessions Completed</div>
                     <div class="stat-value" id="sessionsCompleted">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Pending Balance</div>
+                    <div class="stat-value" id="pendingBalance">0 AED</div>
                 </div>
             </div>
 
@@ -851,6 +1018,7 @@
                                 <th>Package</th>
                                 <th>Sessions</th>
                                 <th>Amount Paid</th>
+                                <th>Last Visit</th>
                                 <th>Status</th>
                                 <th>Actions</th>
                             </tr>
@@ -859,6 +1027,18 @@
                             <!-- Populated by JS -->
                         </tbody>
                     </table>
+                </div>
+
+                <!-- Pagination Controls -->
+                <div class="pagination-container" id="paginationContainer">
+                    <div class="pagination-info">
+                        Showing <span id="paginationInfo"></span>
+                    </div>
+                    <div class="pagination-controls">
+                        <button class="btn btn-small pagination-btn" id="prevPageBtn" onclick="changePage(-1)">← Previous</button>
+                        <span id="pageNumbers" class="page-numbers"></span>
+                        <button class="btn btn-small pagination-btn" id="nextPageBtn" onclick="changePage(1)">Next →</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1443,10 +1623,114 @@
             document.getElementById('setupNotice').style.display = 'block';
         }
 
+        // ==================== TOAST NOTIFICATION SYSTEM ====================
+        function showToast(message, type = 'info', duration = 4000) {
+            const container = document.getElementById('toastContainer');
+            if (!container) return;
+
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+
+            const icons = {
+                success: '✅',
+                error: '❌',
+                warning: '⚠️',
+                info: 'ℹ️'
+            };
+
+            toast.innerHTML = `
+                <span class="toast-icon">${icons[type] || icons.info}</span>
+                <span class="toast-message">${message}</span>
+                <button class="toast-close" onclick="this.parentElement.remove()">×</button>
+            `;
+
+            container.appendChild(toast);
+
+            // Auto remove after duration
+            setTimeout(() => {
+                toast.classList.add('removing');
+                setTimeout(() => toast.remove(), 300);
+            }, duration);
+        }
+
         // ==================== ORIGINAL CODE ====================
         // User accounts & authentication (roles & permissions live in DB; passwords live only in Firebase Auth)
         let users = [];
         let currentUser = null; // { uid, email, role, accessLevel, permissions }
+        
+        // ==================== AUDIT LOGGING & SESSION MANAGEMENT ====================
+        let sessionTimeout = 30 * 60 * 1000; // 30 minutes in milliseconds
+        let sessionTimer = null;
+        let lastActivityTime = Date.now();
+
+        // Log audit event to Firebase
+        function logAudit(action, details = {}) {
+            if (!currentUser) return;
+            
+            const auditEntry = {
+                timestamp: new Date().toISOString(),
+                user: currentUser.email,
+                uid: currentUser.uid,
+                role: currentUser.role,
+                action: action,
+                details: details,
+                userAgent: navigator.userAgent.substring(0, 100)
+            };
+
+            console.log('📝 Audit Log:', action, details);
+
+            if (isFirebaseConfigured) {
+                database.ref('auditLogs').push(auditEntry).catch(err => {
+                    console.error('Failed to save audit log:', err);
+                });
+            }
+        }
+
+        // Reset session timer on user activity
+        function resetSessionTimer() {
+            lastActivityTime = Date.now();
+            
+            if (sessionTimer) {
+                clearTimeout(sessionTimer);
+            }
+
+            sessionTimer = setTimeout(() => {
+                handleSessionTimeout();
+            }, sessionTimeout);
+        }
+
+        // Handle session timeout
+        function handleSessionTimeout() {
+            if (!currentUser) return;
+            
+            const inactiveTime = Date.now() - lastActivityTime;
+            if (inactiveTime >= sessionTimeout) {
+                logAudit('SESSION_TIMEOUT', { 
+                    inactiveMinutes: Math.floor(inactiveTime / 60000)
+                });
+                
+                alert('⏰ Your session has expired due to 30 minutes of inactivity. Please log in again for security.');
+                
+                if (auth) {
+                    auth.signOut();
+                }
+                
+                currentUser = null;
+                window.location.reload();
+            }
+        }
+
+        // Track user activity
+        function trackActivity() {
+            resetSessionTimer();
+        }
+
+        // Initialize activity tracking
+        if (typeof document !== 'undefined') {
+            ['mousedown', 'keypress', 'scroll', 'touchstart', 'click'].forEach(event => {
+                document.addEventListener(event, trackActivity, true);
+            });
+        }
         
         // Emirates ID helpers (3-4-7-1 digit parts with auto-shift)
         function getEmiratesIdFromParts(prefix) {
@@ -1534,39 +1818,23 @@
         let visits = [];
         let packages = [];
 
+        // Pagination
+        let currentPage = 1;
+        const patientsPerPage = 20;
+
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 Application starting...');
+
             if (isFirebaseConfigured) {
                 initializeFirebase();
             } else {
                 loadData();
                 loadUsersFromStorage();
                 ensureOwnerUser();
+                usersLoaded = true;
+                checkAuthState();
                 hideLoading();
-            }
-
-            if (auth) {
-                auth.onAuthStateChanged((fbUser) => {
-                    if (!fbUser) {
-                        currentUser = null;
-                        applyInitialUiState();
-                        return;
-                    }
-
-                    // Try to find a matching role entry by uid or email
-                    const roleEntry = users.find(u => u && (u.uid === fbUser.uid || u.email === fbUser.email));
-                    currentUser = {
-                        uid: fbUser.uid,
-                        email: fbUser.email,
-                        role: roleEntry ? roleEntry.role : 'staff',
-                        accessLevel: roleEntry ? roleEntry.accessLevel : 'low',
-                        permissions: roleEntry ? roleEntry.permissions : getDefaultPermissionsForRole('staff')
-                    };
-
-                    applyInitialUiState();
-                });
-            } else {
-                applyInitialUiState();
             }
 
             populatePackageDropdown();
@@ -1769,6 +2037,12 @@
                 applyInitialUiState();
                 return;
             }
+            
+            // Log audit event before logout
+            logAudit('USER_LOGOUT', {
+                role: currentUser.role
+            });
+            
             auth.signOut().catch((error) => {
                 console.error('Logout error:', error);
             });
@@ -1965,6 +2239,9 @@
         }
 
         // ==================== FIREBASE FUNCTIONS ====================
+        let usersLoaded = false;
+        let authReady = false;
+
         function initializeFirebase() {
             console.log("🔄 Initializing Firebase real-time sync...");
 
@@ -1978,6 +2255,49 @@
                     updateConnectionStatus(false);
                     console.log("⚠️ Disconnected from Firebase");
                 }
+            });
+
+            // CRITICAL FIX: Load users FIRST before setting up auth listener
+            database.ref('security/users').once('value', (snapshot) => {
+                const data = snapshot.val();
+                console.log('📥 Loading users from Firebase:', data);
+
+                if (Array.isArray(data)) {
+                    users = data;
+                } else if (data) {
+                    users = Object.values(data);
+                    console.log(`✅ Loaded ${users.length} users:`, users.map(u => u?.email));
+                } else {
+                    users = [];
+                    console.warn('⚠️ No users found in security/users path');
+                }
+
+                ensureOwnerUser();
+                usersLoaded = true;
+
+                // Now set up continuous sync
+                database.ref('security/users').on('value', (snapshot) => {
+                    const data = snapshot.val();
+                    if (Array.isArray(data)) {
+                        users = data;
+                    } else if (data) {
+                        users = Object.values(data);
+                    } else {
+                        users = [];
+                    }
+
+                    ensureOwnerUser();
+
+                    // Refresh current user's role if they're logged in
+                    if (auth && auth.currentUser) {
+                        updateCurrentUserRole(auth.currentUser);
+                    }
+
+                    applyInitialUiState();
+                });
+
+                // After users loaded, check auth state
+                checkAuthState();
             });
 
             // Load and sync patients
@@ -2012,48 +2332,64 @@
                 console.log(`📦 Loaded ${packages.length} packages from cloud`);
             });
 
-            // Load and sync user accounts (roles & permissions, not passwords)
-            database.ref('security/users').on('value', (snapshot) => {
-                const data = snapshot.val();
-                console.log('📥 Raw users data from Firebase:', data);
-                
-                if (!data) {
-                    users = [];
-                } else if (Array.isArray(data)) {
-                    users = data.filter(u => u !== null && u !== undefined);
-                } else if (typeof data === 'object') {
-                    // Convert object to array - handle both formats:
-                    // Format 1: { "owner": { email: "...", role: "owner", ... } }
-                    // Format 2: { "0": { email: "...", role: "owner", ... } }
-                    users = Object.values(data).filter(u => u !== null && u !== undefined);
-                }
-                
-                console.log('✅ Processed users array:', users);
+            hideLoading();
+        }
 
-                ensureOwnerUser();
+        // Helper function to update current user's role from loaded users array
+        function updateCurrentUserRole(fbUser) {
+            console.log('🔍 Looking for role for user:', fbUser.email, 'UID:', fbUser.uid);
+            console.log('👥 Available users:', users);
 
-                // If someone is already logged in, refresh their role/permissions from the latest users list
-                if (auth && auth.currentUser) {
-                    const fbUser = auth.currentUser;
-                    console.log('🔍 Looking for role entry for:', fbUser.email);
-                    const roleEntry = users.find(u => u && (u.uid === fbUser.uid || u.email === fbUser.email));
-                    console.log('🎯 Found role entry:', roleEntry);
-                    
-                    currentUser = {
-                        uid: fbUser.uid,
-                        email: fbUser.email,
-                        role: roleEntry ? roleEntry.role : 'staff',
-                        accessLevel: roleEntry ? roleEntry.accessLevel : 'low',
-                        permissions: roleEntry ? roleEntry.permissions : getDefaultPermissionsForRole('staff')
-                    };
-                    
-                    console.log('👤 Current user set to:', currentUser);
+            const roleEntry = users.find(u => {
+                console.log('  Checking:', u?.email, u?.uid);
+                return u && (u.uid === fbUser.uid || u.email === fbUser.email);
+            });
+
+            console.log('✅ Found role entry:', roleEntry);
+
+            currentUser = {
+                uid: fbUser.uid,
+                email: fbUser.email,
+                role: roleEntry ? roleEntry.role : 'staff',
+                accessLevel: roleEntry ? roleEntry.accessLevel : 'low',
+                permissions: roleEntry ? roleEntry.permissions : getDefaultPermissionsForRole('staff')
+            };
+
+            console.log('👤 Current user set to:', currentUser);
+
+            if (!roleEntry) {
+                console.warn('⚠️ No role found for user! Defaulting to staff. Check Firebase security/users structure.');
+            }
+        }
+
+        // Check auth state after users are loaded
+        function checkAuthState() {
+            if (!auth || !usersLoaded) return;
+
+            auth.onAuthStateChanged((fbUser) => {
+                console.log('🔐 Auth state changed:', fbUser?.email);
+
+                if (!fbUser) {
+                    currentUser = null;
+                    if (sessionTimer) clearTimeout(sessionTimer);
+                    applyInitialUiState();
+                    return;
                 }
+
+                // Users are already loaded, so we can safely match roles
+                updateCurrentUserRole(fbUser);
+
+                // Log successful login
+                logAudit('USER_LOGIN', {
+                    role: currentUser.role,
+                    accessLevel: currentUser.accessLevel
+                });
+
+                // Start session timeout timer
+                resetSessionTimer();
 
                 applyInitialUiState();
             });
-
-            hideLoading();
         }
 
         function updateConnectionStatus(isConnected) {
@@ -2323,13 +2659,47 @@
 
         function addPatient(event) {
             event.preventDefault();
-            
+
+            // === DUPLICATE DETECTION ===
+            const emiratesId = getEmiratesIdFromParts('emiratesId');
+            const fileNumber = document.getElementById('fileNumber').value.trim();
+            const phone = document.getElementById('phoneNumber').value.trim();
+
+            // Validate Emirates ID format (3-4-7-1)
+            if (!emiratesId || emiratesId.length !== 18) {
+                alert('❌ Invalid Emirates ID format. Please enter all 15 digits (XXX-XXXX-XXXXXXX-X).');
+                return;
+            }
+
+            // Check for duplicate Emirates ID
+            const duplicateEID = patients.find(p => p.emiratesId === emiratesId);
+            if (duplicateEID) {
+                alert(`❌ A patient with this Emirates ID already exists!\n\nName: ${duplicateEID.name}\nFile Number: ${duplicateEID.fileNumber}\n\nPlease check the Emirates ID or search for the existing patient.`);
+                return;
+            }
+
+            // Check for duplicate File Number
+            const duplicateFile = patients.find(p => p.fileNumber === fileNumber);
+            if (duplicateFile) {
+                alert(`❌ A patient with File Number "${fileNumber}" already exists!\n\nName: ${duplicateFile.name}\nEmirates ID: ${duplicateFile.emiratesId}\n\nPlease use a different file number.`);
+                return;
+            }
+
+            // Check for duplicate Phone Number (warning only)
+            const duplicatePhone = patients.find(p => p.phone === phone);
+            if (duplicatePhone) {
+                const confirmed = confirm(`⚠️ Warning: This phone number is already registered to:\n\nName: ${duplicatePhone.name}\nFile Number: ${duplicatePhone.fileNumber}\n\nDo you want to continue adding this patient?`);
+                if (!confirmed) {
+                    return;
+                }
+            }
+
             const isFull = document.getElementById('paymentFull').checked;
             const packagePrice = parseFloat(document.getElementById('packagePrice').value);
             const installmentMethodSelect = document.getElementById('installmentMethod');
             const selectedInstallmentMethod = installmentMethodSelect ? installmentMethodSelect.value : '';
             let amountPaid, remainingBalance, paymentStatus;
-            
+
             if (isFull) {
                 amountPaid = packagePrice;
                 remainingBalance = 0;
@@ -2343,12 +2713,12 @@
                 remainingBalance = packagePrice - amountPaid;
                 paymentStatus = 'Installment';
             }
-            
+
             const patient = {
-            emiratesId: getEmiratesIdFromParts('emiratesId'),
-                fileNumber: document.getElementById('fileNumber').value,
-                name: document.getElementById('patientName').value,
-                phone: document.getElementById('phoneNumber').value,
+                emiratesId: emiratesId,
+                fileNumber: fileNumber,
+                name: document.getElementById('patientName').value.trim(),
+                phone: phone,
                 package: document.getElementById('packageType').value,
                 totalSessions: parseInt(document.getElementById('totalSessions').value),
                 sessionsCompleted: 0,
@@ -2373,6 +2743,16 @@
             };
 
             patients.push(patient);
+            
+            // Log audit event
+            logAudit('PATIENT_ADDED', {
+                patientName: patient.name,
+                fileNumber: patient.fileNumber,
+                package: patient.package,
+                paymentType: paymentStatus,
+                amountPaid: amountPaid
+            });
+            
             saveData();
             
             document.getElementById('addPatientForm').reset();
@@ -2449,6 +2829,14 @@
             };
 
             visits.push(visit);
+            
+            // Log audit event
+            logAudit('VISIT_RECORDED', {
+                patientName: patient.name,
+                fileNumber: patient.fileNumber,
+                sessionNumber: sessionNumber,
+                paymentCollected: installmentPayment || 0
+            });
 
             // Update patient record
             patient.sessionsCompleted++;
@@ -2525,14 +2913,22 @@
             // Calculate stats
             const totalPatients = patients.length;
             const activePatients = patients.filter(p => p.status === 'Active').length;
+            const completedPatients = patients.filter(p => p.status === 'Completed').length;
             const totalRevenue = patients.reduce((sum, p) => sum + p.amountPaid + (p.extraSessionCost || 0), 0);
             const sessionsCompleted = patients.reduce((sum, p) => sum + p.sessionsCompleted, 0);
+            const pendingBalance = patients.reduce((sum, p) => sum + (p.remainingBalance || 0), 0);
 
             // Update stats
             document.getElementById('totalPatients').textContent = totalPatients;
             document.getElementById('activePatients').textContent = activePatients;
+            document.getElementById('completedPatients').textContent = completedPatients;
             document.getElementById('totalRevenue').textContent = totalRevenue.toLocaleString() + ' AED';
             document.getElementById('sessionsCompleted').textContent = sessionsCompleted;
+
+            const pendingBalanceEl = document.getElementById('pendingBalance');
+            if (pendingBalanceEl) {
+                pendingBalanceEl.textContent = pendingBalance.toLocaleString() + ' AED';
+            }
 
             // Update dashboard table
             const tbody = document.getElementById('dashboardTableBody');
@@ -2565,11 +2961,25 @@
 
             const filteredPatients = getFilteredPatients();
 
-            filteredPatients.forEach((patient, index) => {
+            // Pagination logic
+            const totalItems = filteredPatients.length;
+            const totalPages = Math.ceil(totalItems / patientsPerPage);
+
+            // Reset to page 1 if current page is beyond total pages
+            if (currentPage > totalPages && totalPages > 0) {
+                currentPage = 1;
+            }
+
+            const startIndex = (currentPage - 1) * patientsPerPage;
+            const endIndex = Math.min(startIndex + patientsPerPage, totalItems);
+            const paginatedPatients = filteredPatients.slice(startIndex, endIndex);
+
+            // Render paginated patients
+            paginatedPatients.forEach((patient, index) => {
                 const tr = document.createElement('tr');
                 const sessionsRemaining = patient.totalSessions - patient.sessionsCompleted;
                 const actualIndex = patients.indexOf(patient);
-                
+
                 // Payment status display
                 let paymentBadge = '';
                 if (patient.paymentStatus === 'Paid in Full') {
@@ -2577,7 +2987,10 @@
                 } else if (patient.remainingBalance > 0) {
                     paymentBadge = `<span class="badge badge-pending" style="margin-left: 5px;">Balance: ${patient.remainingBalance.toFixed(0)} AED</span>`;
                 }
-                
+
+                // Format last visit date
+                const lastVisitDate = patient.lastVisit ? new Date(patient.lastVisit).toLocaleDateString('en-GB', {day: '2-digit', month: 'short', year: 'numeric'}) : 'Never';
+
                 tr.innerHTML = `
                     <td>${patient.fileNumber}</td>
                     <td>${patient.emiratesId}</td>
@@ -2586,6 +2999,7 @@
                     <td>${patient.package}</td>
                     <td>${patient.sessionsCompleted}/${patient.totalSessions} (${sessionsRemaining} left)</td>
                     <td>${patient.amountPaid.toLocaleString()} AED${paymentBadge}</td>
+                    <td>${lastVisitDate}</td>
                     <td><span class="badge badge-${patient.status.toLowerCase()}">${patient.status}</span></td>
                     <td>
                         <div class="actions">
@@ -2597,6 +3011,67 @@
                 `;
                 tbody.appendChild(tr);
             });
+
+            // Update pagination controls
+            updatePaginationControls(totalItems, totalPages);
+        }
+
+        function updatePaginationControls(totalItems, totalPages) {
+            const container = document.getElementById('paginationContainer');
+            const infoSpan = document.getElementById('paginationInfo');
+            const pageNumbers = document.getElementById('pageNumbers');
+            const prevBtn = document.getElementById('prevPageBtn');
+            const nextBtn = document.getElementById('nextPageBtn');
+
+            // Hide pagination if not needed
+            if (totalItems <= patientsPerPage) {
+                container.style.display = 'none';
+                return;
+            }
+
+            container.style.display = 'flex';
+
+            // Update info text
+            const startIndex = (currentPage - 1) * patientsPerPage + 1;
+            const endIndex = Math.min(currentPage * patientsPerPage, totalItems);
+            infoSpan.textContent = `${startIndex}-${endIndex} of ${totalItems} patients`;
+
+            // Update page numbers
+            pageNumbers.innerHTML = '';
+            const maxPagesToShow = 5;
+            let startPage = Math.max(1, currentPage - Math.floor(maxPagesToShow / 2));
+            let endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
+
+            if (endPage - startPage < maxPagesToShow - 1) {
+                startPage = Math.max(1, endPage - maxPagesToShow + 1);
+            }
+
+            for (let i = startPage; i <= endPage; i++) {
+                const pageBtn = document.createElement('span');
+                pageBtn.className = 'page-number' + (i === currentPage ? ' active' : '');
+                pageBtn.textContent = i;
+                pageBtn.onclick = () => goToPage(i);
+                pageNumbers.appendChild(pageBtn);
+            }
+
+            // Enable/disable prev/next buttons
+            prevBtn.disabled = currentPage === 1;
+            nextBtn.disabled = currentPage === totalPages;
+        }
+
+        function changePage(direction) {
+            const filteredPatients = getFilteredPatients();
+            const totalPages = Math.ceil(filteredPatients.length / patientsPerPage);
+
+            currentPage += direction;
+            currentPage = Math.max(1, Math.min(currentPage, totalPages));
+
+            renderPatients();
+        }
+
+        function goToPage(page) {
+            currentPage = page;
+            renderPatients();
         }
 
         function requestEditPatient(index) {
@@ -2736,6 +3211,7 @@ ${description ? '<div class="row"><span>Description:</span><span>' + description
         }
 
         function filterPatients() {
+            currentPage = 1; // Reset to first page when filtering
             renderPatients();
         }
 
@@ -2879,6 +3355,15 @@ ${description ? '<div class="row"><span>Description:</span><span>' + description
 
         function deletePatient(index) {
             if (confirm('Are you sure you want to delete this patient record?')) {
+                const deletedPatient = patients[index];
+                
+                // Log audit event before deletion
+                logAudit('PATIENT_DELETED', {
+                    patientName: deletedPatient.name,
+                    fileNumber: deletedPatient.fileNumber,
+                    emiratesId: deletedPatient.emiratesId
+                });
+                
                 patients.splice(index, 1);
                 // Also remove associated visits
                 visits = visits.filter(v => v.patientIndex !== index);
@@ -3109,6 +3594,12 @@ ${description ? '<div class="row"><span>Description:</span><span>' + description
             a.download = `Noubel_Patients_${new Date().toISOString().split('T')[0]}.csv`;
             a.click();
             window.URL.revokeObjectURL(url);
+            
+            // Log audit event
+            logAudit('DATA_EXPORTED', {
+                recordCount: patients.length,
+                exportFormat: 'CSV'
+            });
         }
 
         // Close modal when clicking outside
