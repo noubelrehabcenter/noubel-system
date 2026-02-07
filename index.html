@@ -1,0 +1,3134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Noubel Medical Centre - Cloud System</title>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            /* Brand palette */
+            --primary: #7A5D36;
+            --primary-light: #a37b47;
+            --accent: #7A5D36;
+            --accent-light: #a37b47;
+            --bg: #f8f9fa;
+            --card-bg: #ffffff;
+            --text: #2c3e50;
+            --text-light: #6c757d;
+            --border: #e1e8ed;
+            --success: #28a745;
+            --warning: #ffc107;
+            --danger: #dc3545;
+            --shadow: rgba(26, 77, 94, 0.08);
+        }
+
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            color: var(--text);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Loading Overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.95);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+
+        .loading-overlay.hidden {
+            display: none;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Connection Status Badge */
+        .connection-status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 2px 10px var(--shadow);
+        }
+
+        .connection-status.online {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .connection-status.offline {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.online {
+            background: #28a745;
+        }
+
+        .status-dot.offline {
+            background: #dc3545;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Setup Notice */
+        .setup-notice {
+            background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+            border-left: 4px solid #ffc107;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .setup-notice h3 {
+            color: #856404;
+            margin-bottom: 10px;
+        }
+
+        .setup-notice p {
+            color: #856404;
+            margin-bottom: 10px;
+        }
+
+        .setup-notice code {
+            background: white;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.9rem;
+        }
+
+        .setup-notice ol {
+            margin-left: 20px;
+            color: #856404;
+        }
+
+        .setup-notice a {
+            color: #856404;
+            font-weight: bold;
+            text-decoration: underline;
+        }
+
+        /* Header */
+        header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+            color: white;
+            padding: 30px 0;
+            box-shadow: 0 4px 20px var(--shadow);
+            margin-bottom: 30px;
+        }
+
+        .header-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .header-logo img {
+            max-height: 64px;
+            display: block;
+        }
+
+        h1 {
+            font-family: 'Playfair Display', serif;
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 5px;
+            letter-spacing: -0.5px;
+        }
+
+        .subtitle {
+            font-size: 1.1rem;
+            opacity: 0.9;
+            font-weight: 400;
+        }
+
+        /* Navigation */
+        .nav-tabs {
+            display: flex;
+            gap: 10px;
+            background: white;
+            padding: 15px 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px var(--shadow);
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        .tab-btn {
+            padding: 12px 24px;
+            border: none;
+            background: transparent;
+            color: var(--text);
+            font-weight: 500;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            font-size: 0.95rem;
+        }
+
+        .tab-btn:hover {
+            background: var(--bg);
+        }
+
+        .tab-btn.active {
+            background: var(--primary);
+            color: white;
+        }
+
+        /* Tab Content */
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.4s ease;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Cards */
+        .card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 2px 12px var(--shadow);
+            margin-bottom: 20px;
+            border: 1px solid var(--border);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid var(--border);
+        }
+
+        .card-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.5rem;
+            color: var(--primary);
+            font-weight: 600;
+        }
+
+        /* Stats Dashboard */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, var(--card-bg) 0%, #fafbfc 100%);
+            padding: 25px;
+            border-radius: 12px;
+            border-left: 4px solid var(--accent);
+            box-shadow: 0 2px 10px var(--shadow);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 20px var(--shadow);
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            color: var(--text-light);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 600;
+            color: var(--primary);
+            font-family: 'Playfair Display', serif;
+        }
+
+        /* Forms */
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--text);
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-family: 'DM Sans', sans-serif;
+            transition: all 0.3s ease;
+            background: white;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(26, 77, 94, 0.1);
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 12px 28px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.95rem;
+            font-family: 'DM Sans', sans-serif;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-light);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px var(--shadow);
+        }
+
+        .btn-secondary {
+            background: var(--accent);
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: var(--accent-light);
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+
+        .btn-small {
+            padding: 8px 16px;
+            font-size: 0.85rem;
+        }
+
+        /* Login */
+        .login-container {
+            max-width: 420px;
+            margin: 40px auto;
+            padding: 20px;
+        }
+
+        .login-card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 24px 28px;
+            box-shadow: 0 2px 15px var(--shadow);
+            border: 1px solid var(--border);
+        }
+
+        .login-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.6rem;
+            color: var(--primary);
+            margin-bottom: 10px;
+        }
+
+        .login-subtitle {
+            font-size: 0.9rem;
+            color: var(--text-light);
+            margin-bottom: 20px;
+        }
+
+        .login-error {
+            display: none;
+            margin-top: 10px;
+            color: var(--danger);
+            font-size: 0.9rem;
+        }
+
+        .current-user-badge {
+            margin-top: 6px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.12);
+            font-size: 0.8rem;
+        }
+
+        /* Table */
+        .table-container {
+            overflow-x: auto;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px var(--shadow);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+        }
+
+        thead {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+            color: white;
+        }
+
+        th {
+            padding: 15px 12px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        td {
+            padding: 15px 12px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        tbody tr {
+            transition: background 0.2s ease;
+        }
+
+        tbody tr:hover {
+            background: var(--bg);
+        }
+
+        /* Status Badges */
+        .badge {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .badge-active {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .badge-completed {
+            background: #cce5ff;
+            color: #004085;
+        }
+
+        .badge-pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        /* Actions */
+        .actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .action-btn {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.3s ease;
+        }
+
+        .edit-btn {
+            background: #17a2b8;
+            color: white;
+        }
+
+        .delete-btn {
+            background: var(--danger);
+            color: white;
+        }
+
+        .view-btn {
+            background: var(--accent);
+            color: white;
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            max-width: 800px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            animation: slideUp 0.3s ease;
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(30px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid var(--border);
+        }
+
+        .close-modal {
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-light);
+            background: none;
+            border: none;
+        }
+
+        /* Progress Bar */
+        .progress-container {
+            margin-top: 10px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: var(--border);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--success), #5cb85c);
+            border-radius: 10px;
+            transition: width 0.3s ease;
+        }
+
+        .progress-text {
+            font-size: 0.85rem;
+            color: var(--text-light);
+            margin-top: 5px;
+        }
+
+        /* Search and Filter */
+        .search-filter {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .search-box {
+            flex: 1;
+            min-width: 250px;
+        }
+
+        .filter-select {
+            min-width: 200px;
+        }
+
+        /* Export Button */
+        .export-section {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 1.8rem;
+            }
+
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .nav-tabs {
+                flex-direction: column;
+            }
+
+            .tab-btn {
+                width: 100%;
+            }
+        }
+
+        /* Print Styles */
+        @media print {
+            .nav-tabs, .btn, .actions, header {
+                display: none;
+            }
+
+            .card {
+                box-shadow: none;
+                border: 1px solid #ddd;
+            }
+        }
+
+        /* Payment Success / Invoice Modal */
+        .invoice-modal .modal-content {
+            max-width: 450px;
+        }
+        .invoice-payment-details {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner"></div>
+        <p style="margin-top: 20px; color: var(--text-light);">Connecting to cloud database...</p>
+    </div>
+
+    <!-- Connection Status -->
+    <div class="connection-status online" id="connectionStatus">
+        <div class="status-dot online" id="statusDot"></div>
+        <span id="statusText">Connected</span>
+    </div>
+
+    <header>
+        <div class="header-content">
+            <div class="header-logo">
+                <!-- Update the src path if you place the logo elsewhere in your project -->
+                <img src="assets/Noubel logo.jpeg" alt="Noubel Rehabilitation Center logo">
+            </div>
+            <div>
+                <h1>Noubel Medical Centre</h1>
+                <p class="subtitle">Laser Therapy Patient Tracking System</p>
+                <div id="currentUserBadge" class="current-user-badge" style="display: none;">
+                    <span id="currentUserName"></span>
+                    <span>•</span>
+                    <span id="currentUserRole"></span>
+                    <button type="button" class="btn btn-small" style="margin-left: 8px; padding: 4px 10px;" onclick="logout()">
+                        Logout
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Login -->
+    <div id="loginContainer" class="login-container">
+        <div class="login-card">
+            <h2 class="login-title">Sign in</h2>
+            <p class="login-subtitle">
+                Use your email and password. The default owner account should be created once in Firebase Authentication and linked here.
+            </p>
+            <form id="loginForm" onsubmit="handleLogin(event)">
+                <div class="form-group">
+                    <label for="loginEmail">Email</label>
+                    <input type="email" id="loginEmail" required autocomplete="email">
+                </div>
+                <div class="form-group">
+                    <label for="loginPassword">Password</label>
+                    <input type="password" id="loginPassword" required autocomplete="current-password">
+                </div>
+                <button type="submit" class="btn btn-primary" style="margin-top: 10px; width: 100%;">Sign in</button>
+                <div id="loginError" class="login-error">Invalid username or password.</div>
+            </form>
+        </div>
+    </div>
+
+    <div class="container" id="appContainer" style="display: none;">
+        <!-- Setup Notice (shown if Firebase not configured) -->
+        <div class="setup-notice" id="setupNotice" style="display: none;">
+            <h3>⚙️ Firebase Configuration Required</h3>
+            <p><strong>To enable cloud synchronization across all devices, please follow these steps:</strong></p>
+            <ol>
+                <li>Go to <a href="https://console.firebase.google.com/" target="_blank">Firebase Console</a></li>
+                <li>Create a new project (or use existing)</li>
+                <li>Enable Realtime Database</li>
+                <li>Copy your configuration and paste in the JavaScript section (search for "YOUR_API_KEY_HERE")</li>
+            </ol>
+            <p style="margin-top: 10px;"><strong>💡 Need help?</strong> See the detailed SETUP_GUIDE.md file included in your download.</p>
+            <p style="margin-top: 10px; padding: 10px; background: white; border-radius: 6px;">
+                <strong>⚠️ Currently in Demo Mode:</strong> Data is saved locally in this browser only. Enable Firebase for multi-device cloud sync.
+            </p>
+        </div>
+
+        <!-- Navigation -->
+        <div class="nav-tabs" id="navTabs" style="display: none;">
+            <button class="tab-btn active" data-tab="dashboard" onclick="switchTab('dashboard', this)">📊 Dashboard</button>
+            <button class="tab-btn" data-tab="patients" onclick="switchTab('patients', this)">👥 Patients</button>
+            <button class="tab-btn" data-tab="add-patient" onclick="switchTab('add-patient', this)">➕ Add Patient</button>
+            <button class="tab-btn" data-tab="visits" onclick="switchTab('visits', this)">📅 Record Visit</button>
+            <button class="tab-btn" data-tab="extra-sessions" onclick="switchTab('extra-sessions', this)">➕ Extra Sessions</button>
+            <button class="tab-btn" data-tab="history" onclick="switchTab('history', this)">📋 Visit History</button>
+            <button class="tab-btn" data-tab="packages" onclick="switchTab('packages', this)">📦 Packages</button>
+            <button class="tab-btn" data-tab="security" onclick="switchTab('security', this)">👤 Users &amp; Access</button>
+        </div>
+
+        <!-- Dashboard Tab -->
+        <div id="dashboard" class="tab-content active">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">Total Patients</div>
+                    <div class="stat-value" id="totalPatients">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Active Patients</div>
+                    <div class="stat-value" id="activePatients">0</div>
+                </div>
+                <div class="stat-card" data-permission="viewRevenue">
+                    <div class="stat-label">Total Revenue</div>
+                    <div class="stat-value" id="totalRevenue">0 AED</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Sessions Completed</div>
+                    <div class="stat-value" id="sessionsCompleted">0</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">Recent Patients</h2>
+                </div>
+                <div class="table-container">
+                    <table id="dashboardTable">
+                        <thead>
+                            <tr>
+                                <th>File No.</th>
+                                <th>Patient Name</th>
+                                <th>Package</th>
+                                <th>Progress</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dashboardTableBody">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Patients Tab -->
+        <div id="patients" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">Patient Records</h2>
+                    <div class="export-section">
+                        <button class="btn btn-secondary btn-small" onclick="exportToExcel()">📥 Export to Excel</button>
+                    </div>
+                </div>
+
+                <div class="search-filter">
+                    <div class="search-box">
+                        <input type="text" id="searchPatient" placeholder="🔍 Search by name, file number, or Emirates ID..." oninput="filterPatients()">
+                    </div>
+                    <div class="filter-select">
+                        <select id="statusFilter" onchange="filterPatients()">
+                            <option value="">All Statuses</option>
+                            <option value="Active">Active</option>
+                            <option value="Completed">Completed</option>
+                            <option value="Pending">Pending</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <table id="patientsTable">
+                        <thead>
+                            <tr>
+                                <th>File No.</th>
+                                <th>Emirates ID</th>
+                                <th>Patient Name</th>
+                                <th>Phone</th>
+                                <th>Package</th>
+                                <th>Sessions</th>
+                                <th>Amount Paid</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="patientsTableBody">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Users & Access Tab -->
+        <div id="security" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">Users &amp; Access</h2>
+                </div>
+                <p style="margin-bottom: 15px; color: var(--text-light);">
+                    Create and manage user accounts, roles, and permissions. Only the <strong>owner</strong> account can access this section.
+                </p>
+
+                <div class="card" style="margin-bottom: 20px;">
+                    <div class="card-header">
+                        <h3 class="card-title" style="font-size: 1.2rem;">Existing Users</h3>
+                    </div>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Username</th>
+                                    <th>Role</th>
+                                    <th>Access Level</th>
+                                    <th>Permissions</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="usersTableBody">
+                                <!-- Populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title" style="font-size: 1.2rem;" id="userFormTitle">Add New User</h3>
+                    </div>
+                    <form id="userForm" onsubmit="saveUser(event)">
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="userUsername">Username *</label>
+                                <input type="text" id="userUsername" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="userPassword">Password *</label>
+                                <input type="password" id="userPassword" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="userRole">Role *</label>
+                                <select id="userRole" required>
+                                    <option value="">Select role...</option>
+                                    <option value="owner">Owner</option>
+                                    <option value="manager">Manager</option>
+                                    <option value="reception">Reception / Data Entry</option>
+                                    <option value="staff">Staff</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="userAccessLevel">Access Level *</label>
+                                <select id="userAccessLevel" required>
+                                    <option value="owner">Owner</option>
+                                    <option value="high">High</option>
+                                    <option value="medium">Medium</option>
+                                    <option value="low">Low</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <h4 style="margin-top: 10px; margin-bottom: 10px;">Permissions</h4>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label><input type="checkbox" id="permViewRevenue"> Can view total revenue</label>
+                                <label><input type="checkbox" id="permExportData"> Can export data</label>
+                                <label><input type="checkbox" id="permViewPayments"> Can view payment details</label>
+                            </div>
+                            <div class="form-group">
+                                <label><input type="checkbox" id="permManagePatients"> Can add &amp; edit patients</label>
+                                <label><input type="checkbox" id="permDeletePatients"> Can delete patients</label>
+                            </div>
+                            <div class="form-group">
+                                <label><input type="checkbox" id="permManagePackages"> Can add &amp; edit packages</label>
+                                <label><input type="checkbox" id="permDeletePackages"> Can delete packages</label>
+                            </div>
+                            <div class="form-group">
+                                <label><input type="checkbox" id="permManageUsers"> Can manage users &amp; access</label>
+                            </div>
+                        </div>
+
+                        <input type="hidden" id="editingUserIndex" value="">
+
+                        <div style="display: flex; gap: 10px; margin-top: 15px;">
+                            <button type="submit" class="btn btn-primary">💾 Save User</button>
+                            <button type="button" class="btn btn-secondary" onclick="resetUserForm()">Reset</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add Patient Tab -->
+        <div id="add-patient" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">Add New Patient</h2>
+                </div>
+
+                <form id="addPatientForm" onsubmit="addPatient(event)">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="emiratesIdPart1">Emirates ID *</label>
+                            <div style="display: flex; gap: 6px;">
+                                <input type="text" id="emiratesIdPart1" maxlength="3" inputmode="numeric" placeholder="784" required>
+                                <input type="text" id="emiratesIdPart2" maxlength="4" inputmode="numeric" placeholder="XXXX" required>
+                                <input type="text" id="emiratesIdPart3" maxlength="7" inputmode="numeric" placeholder="XXXXXXX" required>
+                                <input type="text" id="emiratesIdPart4" maxlength="1" inputmode="numeric" placeholder="X" required>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="fileNumber">File Number *</label>
+                            <input type="text" id="fileNumber" placeholder="NMC-001" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="patientName">Patient Name *</label>
+                            <input type="text" id="patientName" placeholder="Enter full name" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="phoneNumber">Phone Number *</label>
+                            <input type="tel" id="phoneNumber" placeholder="+971-XX-XXX-XXXX" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="packageType">Package Type *</label>
+                            <select id="packageType" required onchange="updatePackagePrice()">
+                                <option value="">Select package...</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="totalSessions">Total Sessions *</label>
+                            <input type="number" id="totalSessions" placeholder="12" required readonly>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="packagePrice">Package Price (AED) *</label>
+                            <input type="number" id="packagePrice" placeholder="3600" required readonly>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="registrationDate">Registration Date *</label>
+                            <input type="date" id="registrationDate" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="packageStartDate">Package Start Date *</label>
+                            <input type="date" id="packageStartDate" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="packageEndDate">Package End Date *</label>
+                            <input type="date" id="packageEndDate" required>
+                        </div>
+                    </div>
+
+                    <div class="card" style="background: #f8f9fa; padding: 20px; margin-bottom: 20px;">
+                        <h3 style="margin-bottom: 15px; color: var(--primary); font-size: 1.1rem;">Payment Details</h3>
+                        
+                        <div class="form-group">
+                            <label style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="radio" name="paymentType" value="full" id="paymentFull" onchange="togglePaymentFields()" checked style="width: auto; margin-right: 10px;">
+                                <span style="font-weight: 600;">Full Payment</span>
+                            </label>
+                            <label style="display: flex; align-items: center; cursor: pointer; margin-top: 10px;">
+                                <input type="radio" name="paymentType" value="installment" id="paymentInstallment" onchange="togglePaymentFields()" style="width: auto; margin-right: 10px;">
+                                <span style="font-weight: 600;">Installment Payment</span>
+                            </label>
+                        </div>
+
+                        <div id="fullPaymentFields" style="display: block; margin-top: 15px;">
+                            <div class="form-group">
+                                <label for="amountPaid">Amount Paid (AED) *</label>
+                                <input type="number" id="amountPaid" placeholder="3600" required readonly>
+                            </div>
+                        </div>
+
+                        <div id="installmentFields" style="display: none; margin-top: 15px;">
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label for="initialPayment">Initial Payment (AED) *</label>
+                                    <input type="number" id="initialPayment" placeholder="1000" min="0" step="0.01">
+                                </div>
+                                <div class="form-group">
+                                    <label for="remainingBalance">Remaining Balance (AED)</label>
+                                    <input type="number" id="remainingBalance" placeholder="Calculated automatically" readonly>
+                                </div>
+                                <div class="form-group">
+                                    <label for="installmentMethod">Installment Method</label>
+                                    <select id="installmentMethod">
+                                        <option value="">Select method...</option>
+                                        <option value="Tabby">Tabby</option>
+                                        <option value="Tamara">Tamara</option>
+                                        <option value="Cash">Cash</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="paymentStatusDisplay" style="margin-top: 15px; padding: 10px; background: white; border-radius: 6px; display: none;">
+                            <strong>Payment Status:</strong> <span id="paymentStatusText"></span>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="notes">Notes</label>
+                        <textarea id="notes" placeholder="Additional notes..."></textarea>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">Add Patient</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Record Visit Tab -->
+        <div id="visits" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">Record Regular Visit</h2>
+                </div>
+
+                <form id="recordVisitForm" onsubmit="recordVisit(event)">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="visitPatient">Select Patient *</label>
+                            <select id="visitPatient" required onchange="updateSessionInfo()">
+                                <option value="">Select patient...</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="visitDate">Visit Date *</label>
+                            <input type="date" id="visitDate" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="currentSessionDisplay">Session Number</label>
+                            <input type="text" id="currentSessionDisplay" placeholder="Select a patient first" readonly>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="technicianName">Technician Name</label>
+                            <input type="text" id="technicianName" placeholder="Enter technician name">
+                        </div>
+                    </div>
+
+                    <div id="paymentCollectionSection" style="display: none; margin-bottom: 20px; padding: 15px; background: #fff3cd; border-radius: 8px;">
+                        <h4 style="margin-bottom: 10px; color: #856404;">💰 Installment Payment Due</h4>
+                        <p id="paymentDueInfo" style="margin-bottom: 10px;"></p>
+                        <div class="form-group">
+                            <label for="installmentPayment">Collect Payment (AED)</label>
+                            <input type="number" id="installmentPayment" placeholder="Enter amount" min="0" step="0.01" value="0">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="visitNotes">Visit Notes</label>
+                        <textarea id="visitNotes" placeholder="Treatment details, observations..."></textarea>
+                    </div>
+
+                    <div class="form-group" id="sessionWarning" style="display: none; padding: 15px; background: #fff3cd; border-radius: 8px; color: #856404; margin-bottom: 15px;">
+                        <strong>⚠️ Warning:</strong> This patient has completed all scheduled sessions. Please use the "Extra Sessions" tab to add additional sessions.
+                    </div>
+
+                    <button type="submit" class="btn btn-success" id="recordVisitBtn">Record Visit</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Extra Sessions Tab -->
+        <div id="extra-sessions" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">Record Extra Session</h2>
+                </div>
+
+                <form id="extraSessionForm" onsubmit="recordExtraSession(event)">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="extraPatient">Select Patient *</label>
+                            <select id="extraPatient" required onchange="updateExtraSessionInfo()">
+                                <option value="">Select patient...</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="extraVisitDate">Visit Date *</label>
+                            <input type="date" id="extraVisitDate" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="extraSessionNumber">Extra Session Number</label>
+                            <input type="text" id="extraSessionNumber" placeholder="Select a patient first" readonly>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="extraAmount">Amount Charged (AED) *</label>
+                            <input type="number" id="extraAmount" placeholder="Enter amount" required min="0" step="0.01">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="extraTechnician">Technician Name</label>
+                            <input type="text" id="extraTechnician" placeholder="Enter technician name">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="extraNotes">Visit Notes</label>
+                        <textarea id="extraNotes" placeholder="Treatment details, observations..."></textarea>
+                    </div>
+
+                    <button type="submit" class="btn btn-success">Record Extra Session</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Visit History Tab -->
+        <div id="history" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">All Visit History</h2>
+                </div>
+
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>File No.</th>
+                                <th>Patient Name</th>
+                                <th>Session #</th>
+                                <th>Type</th>
+                                <th>Amount</th>
+                                <th>Technician</th>
+                            </tr>
+                        </thead>
+                        <tbody id="visitsTableBody">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Packages Tab -->
+        <div id="packages" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">Manage Packages</h2>
+                    <button class="btn btn-primary btn-small" onclick="showAddPackageForm()">➕ Add New Package</button>
+                </div>
+
+                <div id="addPackageForm" style="display: none; margin-bottom: 20px; padding: 20px; background: #f8f9fa; border-radius: 8px;">
+                    <h3 style="margin-bottom: 15px;">Add New Package</h3>
+                    <form onsubmit="addNewPackage(event)">
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="newPackageName">Package Name *</label>
+                                <input type="text" id="newPackageName" placeholder="e.g., Full Body - 12 Sessions" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="newPackageArea">Treatment Area *</label>
+                                <input type="text" id="newPackageArea" placeholder="e.g., Full Body" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="newPackageSessions">Number of Sessions *</label>
+                                <input type="number" id="newPackageSessions" placeholder="12" required min="1">
+                            </div>
+                            <div class="form-group">
+                                <label for="newPackagePrice">Package Price (AED) *</label>
+                                <input type="number" id="newPackagePrice" placeholder="3600" required min="0" step="0.01">
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 10px;">
+                            <button type="submit" class="btn btn-success">Save Package</button>
+                            <button type="button" class="btn btn-secondary" onclick="hideAddPackageForm()">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Package Name</th>
+                                <th>Treatment Area</th>
+                                <th>Sessions</th>
+                                <th>Price (AED)</th>
+                                <th>Price per Session</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="packagesTableBody">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Patient Details Modal -->
+    <div id="patientModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="card-title">Patient Details</h2>
+                <button class="close-modal" onclick="closeModal()">&times;</button>
+            </div>
+            <div id="modalBody">
+                <!-- Populated by JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Password Modal -->
+    <div id="passwordModal" class="modal">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h2 class="card-title">🔒 Authentication Required</h2>
+                <button class="close-modal" onclick="closePasswordModal()">&times;</button>
+            </div>
+            <div style="padding: 20px 0;">
+                <p id="passwordPrompt" style="margin-bottom: 20px; color: var(--text-light);"></p>
+                <div class="form-group">
+                    <label for="passwordInput">Password</label>
+                    <input type="password" id="passwordInput" placeholder="Enter password" onkeypress="handlePasswordEnter(event)">
+                </div>
+                <div id="passwordError" style="display: none; color: var(--danger); margin-top: 10px; font-size: 0.9rem;">
+                    ❌ Incorrect password. Please try again.
+                </div>
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button class="btn btn-primary" onclick="verifyPassword()">Submit</button>
+                    <button class="btn btn-secondary" onclick="closePasswordModal()">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Package Modal -->
+    <div id="editPackageModal" class="modal">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h2 class="card-title">Edit Package</h2>
+                <button class="close-modal" onclick="closeEditPackageModal()">&times;</button>
+            </div>
+            <form id="editPackageForm" onsubmit="savePackageEdit(event)">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="editPackageName">Package Name *</label>
+                        <input type="text" id="editPackageName" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="editPackageArea">Treatment Area *</label>
+                        <input type="text" id="editPackageArea" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="editPackageSessions">Number of Sessions *</label>
+                        <input type="number" id="editPackageSessions" required min="1">
+                    </div>
+                    <div class="form-group">
+                        <label for="editPackagePrice">Package Price (AED) *</label>
+                        <input type="number" id="editPackagePrice" required min="0" step="0.01">
+                    </div>
+                </div>
+                <input type="hidden" id="editPackageIndex">
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button type="submit" class="btn btn-success">Save Changes</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeEditPackageModal()">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Payment Success / Print Invoice Modal -->
+    <div id="paymentSuccessModal" class="modal invoice-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="card-title">✅ Payment Recorded</h2>
+                <button class="close-modal" onclick="closePaymentSuccessModal()">&times;</button>
+            </div>
+            <div style="padding: 20px 0;">
+                <p style="margin-bottom: 15px; color: var(--text);">Payment has been recorded successfully.</p>
+                <div id="paymentSuccessDetails" class="invoice-payment-details">
+                    <!-- Populated by JS -->
+                </div>
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button class="btn btn-primary" onclick="printLastInvoice()">🖨️ Print Invoice</button>
+                    <button class="btn btn-secondary" onclick="closePaymentSuccessModal()">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Patient Modal -->
+    <div id="editPatientModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="card-title">Edit Patient Details</h2>
+                <button class="close-modal" onclick="closeEditPatientModal()">&times;</button>
+            </div>
+            <form id="editPatientForm" onsubmit="savePatientEdit(event)">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="editEmiratesIdPart1">Emirates ID *</label>
+                        <div style="display: flex; gap: 6px;">
+                            <input type="text" id="editEmiratesIdPart1" maxlength="3" inputmode="numeric" required>
+                            <input type="text" id="editEmiratesIdPart2" maxlength="4" inputmode="numeric" required>
+                            <input type="text" id="editEmiratesIdPart3" maxlength="7" inputmode="numeric" required>
+                            <input type="text" id="editEmiratesIdPart4" maxlength="1" inputmode="numeric" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="editFileNumber">File Number *</label>
+                        <input type="text" id="editFileNumber" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="editPatientName">Patient Name *</label>
+                        <input type="text" id="editPatientName" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="editPhoneNumber">Phone Number *</label>
+                        <input type="tel" id="editPhoneNumber" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="editNotes">Notes</label>
+                    <textarea id="editNotes"></textarea>
+                </div>
+                <input type="hidden" id="editPatientIndex">
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button type="submit" class="btn btn-success">Save Changes</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeEditPatientModal()">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // ==================== FIREBASE CONFIGURATION ====================
+        // REPLACE THIS WITH YOUR FIREBASE CONFIG
+        const firebaseConfig = {
+        apiKey: "AIzaSyCjdNkGh--m_l4L1NGg2uqJpUt9TaGQo_w",
+        authDomain: "noubel-medical-centre-laser.firebaseapp.com",
+        databaseURL: "https://noubel-medical-centre-laser-default-rtdb.europe-west1.firebasedatabase.app/",
+        projectId: "noubel-medical-centre-laser",
+        storageBucket: "noubel-medical-centre-laser.firebasestorage.app",
+        messagingSenderId: "963512209927",
+        appId: "1:963512209927:web:3b285c219bba95b19850a2"
+        };
+
+        // Initialize Firebase
+        let database;
+        let auth;
+        let isFirebaseConfigured = false;
+
+        try {
+            if (firebaseConfig.apiKey !== "https://console.firebase.google.com/u/6/project/noubel-medical-centre-laser/database/noubel-medical-centre-laser-default-rtdb/data/~2F") {
+                firebase.initializeApp(firebaseConfig);
+                auth = firebase.auth();
+                database = firebase.database();
+                isFirebaseConfigured = true;
+                console.log("✅ Firebase connected successfully - Cloud sync enabled!");
+            } else {
+                console.warn("⚠️ Firebase not configured. Using demo mode (localStorage only).");
+                document.getElementById('setupNotice').style.display = 'block';
+            }
+        } catch (error) {
+            console.error("Firebase initialization error:", error);
+            document.getElementById('setupNotice').style.display = 'block';
+        }
+
+        // ==================== ORIGINAL CODE ====================
+        // User accounts & authentication (roles & permissions live in DB; passwords live only in Firebase Auth)
+        let users = [];
+        let currentUser = null; // { uid, email, role, accessLevel, permissions }
+        
+        // Emirates ID helpers (3-4-7-1 digit parts with auto-shift)
+        function getEmiratesIdFromParts(prefix) {
+            const p1 = document.getElementById(prefix + 'Part1')?.value.trim() || '';
+            const p2 = document.getElementById(prefix + 'Part2')?.value.trim() || '';
+            const p3 = document.getElementById(prefix + 'Part3')?.value.trim() || '';
+            const p4 = document.getElementById(prefix + 'Part4')?.value.trim() || '';
+
+            if (!p1 && !p2 && !p3 && !p4) return '';
+            return `${p1}-${p2}-${p3}-${p4}`;
+        }
+
+        function setEmiratesIdParts(prefix, emiratesId) {
+            const input1 = document.getElementById(prefix + 'Part1');
+            const input2 = document.getElementById(prefix + 'Part2');
+            const input3 = document.getElementById(prefix + 'Part3');
+            const input4 = document.getElementById(prefix + 'Part4');
+
+            if (!input1 || !input2 || !input3 || !input4) return;
+
+            let p1 = '', p2 = '', p3 = '', p4 = '';
+            const value = emiratesId || '';
+
+            if (value.includes('-')) {
+                const parts = value.split('-');
+                p1 = parts[0] || '';
+                p2 = parts[1] || '';
+                p3 = parts[2] || '';
+                p4 = parts[3] || '';
+            } else {
+                const digits = value.replace(/\D/g, '');
+                if (digits.length === 15) {
+                    p1 = digits.slice(0, 3);
+                    p2 = digits.slice(3, 7);
+                    p3 = digits.slice(7, 14);
+                    p4 = digits.slice(14, 15);
+                } else {
+                    p1 = digits;
+                }
+            }
+
+            input1.value = p1;
+            input2.value = p2;
+            input3.value = p3;
+            input4.value = p4;
+        }
+
+        function setupEmiratesIdAutoAdvance(prefix) {
+            const parts = [
+                document.getElementById(prefix + 'Part1'),
+                document.getElementById(prefix + 'Part2'),
+                document.getElementById(prefix + 'Part3'),
+                document.getElementById(prefix + 'Part4')
+            ];
+            const maxLengths = [3, 4, 7, 1];
+
+            parts.forEach((input, index) => {
+                if (!input) return;
+
+                input.addEventListener('input', () => {
+                    // Allow only digits and enforce length
+                    input.value = (input.value || '').replace(/\D/g, '').slice(0, maxLengths[index]);
+
+                    if (input.value.length === maxLengths[index] && index < parts.length - 1) {
+                        parts[index + 1]?.focus();
+                    }
+                });
+
+                input.addEventListener('keydown', (event) => {
+                    if (event.key === 'Backspace' && input.value.length === 0 && index > 0) {
+                        parts[index - 1]?.focus();
+                    }
+                });
+            });
+        }
+
+        // Password action tracking (used for re-auth on sensitive actions)
+        let pendingAction = null;
+
+        // Last payment data for invoice printing
+        let lastPaymentInvoiceData = null;
+
+        // Data Storage
+        let patients = [];
+        let visits = [];
+        let packages = [];
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            if (isFirebaseConfigured) {
+                initializeFirebase();
+            } else {
+                loadData();
+                loadUsersFromStorage();
+                ensureOwnerUser();
+                hideLoading();
+            }
+
+            if (auth) {
+                auth.onAuthStateChanged((fbUser) => {
+                    if (!fbUser) {
+                        currentUser = null;
+                        applyInitialUiState();
+                        return;
+                    }
+
+                    // Try to find a matching role entry by uid or email
+                    const roleEntry = users.find(u => u && (u.uid === fbUser.uid || u.email === fbUser.email));
+                    currentUser = {
+                        uid: fbUser.uid,
+                        email: fbUser.email,
+                        role: roleEntry ? roleEntry.role : 'staff',
+                        accessLevel: roleEntry ? roleEntry.accessLevel : 'low',
+                        permissions: roleEntry ? roleEntry.permissions : getDefaultPermissionsForRole('staff')
+                    };
+
+                    applyInitialUiState();
+                });
+            } else {
+                applyInitialUiState();
+            }
+
+            populatePackageDropdown();
+            displayPackages();
+            setTodayDate();
+            updateDashboard();
+            renderPatients();
+            renderVisits();
+            
+            setupEmiratesIdAutoAdvance('emiratesId');
+            setupEmiratesIdAutoAdvance('editEmiratesId');
+        });
+
+        function getDefaultPermissionsForRole(role) {
+            const base = {
+                viewRevenue: false,
+                exportData: false,
+                viewPayments: false,
+                managePatients: false,
+                deletePatients: false,
+                managePackages: false,
+                deletePackages: false,
+                manageUsers: false
+            };
+
+            if (role === 'owner') {
+                return {
+                    viewRevenue: true,
+                    exportData: true,
+                    viewPayments: true,
+                    managePatients: true,
+                    deletePatients: true,
+                    managePackages: true,
+                    deletePackages: true,
+                    manageUsers: true
+                };
+            }
+
+            if (role === 'manager') {
+                return {
+                    ...base,
+                    viewRevenue: true,
+                    exportData: true,
+                    viewPayments: true,
+                    managePatients: true,
+                    deletePatients: true,
+                    managePackages: true
+                };
+            }
+
+            if (role === 'reception') {
+                return {
+                    ...base,
+                    managePatients: true
+                };
+            }
+
+            // staff / default
+            return {
+                ...base,
+                managePatients: true
+            };
+        }
+
+        function ensureOwnerUser() {
+            if (!Array.isArray(users)) {
+                users = [];
+            }
+            const hasOwner = users.some(u => u && u.role === 'owner');
+            if (!hasOwner) {
+                console.warn('No owner role found in security/users. Please create an owner user in Firebase Auth and then add a matching role entry here via the Users & Access tab.');
+            }
+        }
+
+        function persistUsers() {
+            if (isFirebaseConfigured && database) {
+                database.ref('security/users').set(users).catch((error) => {
+                    console.error('Error saving users to Firebase:', error);
+                });
+            } else {
+                try {
+                    localStorage.setItem('nmcl_users', JSON.stringify(users));
+                } catch (e) {
+                    console.warn('Unable to save users to localStorage:', e);
+                }
+            }
+        }
+
+        function loadUsersFromStorage() {
+            try {
+                const stored = localStorage.getItem('nmcl_users');
+                if (stored) {
+                    users = JSON.parse(stored) || [];
+                }
+            } catch (e) {
+                console.warn('Unable to read users from localStorage:', e);
+            }
+        }
+
+        function hasPermission(permission) {
+            // Owner role (or explicitly configured owner email) always has full permissions as a safety net
+            if (currentUser && (currentUser.role === 'owner' || currentUser.email === 'owner@noubel.com')) {
+                return true;
+            }
+            return !!(currentUser && currentUser.permissions && currentUser.permissions[permission]);
+        }
+
+        function requirePermission(permission, action) {
+            if (!currentUser) {
+                alert('You must be signed in to perform this action.');
+                return;
+            }
+            if (!hasPermission(permission)) {
+                alert('You do not have permission to perform this action.');
+                return;
+            }
+            if (typeof action === 'function') {
+                action();
+            }
+        }
+
+        function applyInitialUiState() {
+            const appContainer = document.getElementById('appContainer');
+            const navTabs = document.getElementById('navTabs');
+            const loginContainer = document.getElementById('loginContainer');
+
+            if (!appContainer || !navTabs || !loginContainer) return;
+
+            if (!currentUser) {
+                appContainer.style.display = 'none';
+                navTabs.style.display = 'none';
+                loginContainer.style.display = 'block';
+                updateCurrentUserBadge();
+            } else {
+                appContainer.style.display = 'block';
+                navTabs.style.display = 'flex';
+                loginContainer.style.display = 'none';
+                applyUserPermissions();
+                updateCurrentUserBadge();
+            }
+        }
+
+        function updateCurrentUserBadge() {
+            const badge = document.getElementById('currentUserBadge');
+            const nameSpan = document.getElementById('currentUserName');
+            const roleSpan = document.getElementById('currentUserRole');
+
+            if (!badge || !nameSpan || !roleSpan) return;
+
+            if (!currentUser) {
+                badge.style.display = 'none';
+                return;
+            }
+
+            nameSpan.textContent = currentUser.email || currentUser.username || '';
+            roleSpan.textContent = currentUser.role || 'user';
+            badge.style.display = 'inline-flex';
+        }
+
+        function applyUserPermissions() {
+            const revenueCard = document.querySelector('[data-permission="viewRevenue"]');
+            const securityTabBtn = document.querySelector('.nav-tabs [data-tab="security"]');
+
+            if (revenueCard) {
+                revenueCard.style.display = hasPermission('viewRevenue') ? '' : 'none';
+            }
+
+            // Always show the Users & Access tab in the nav,
+            // actual actions inside are still protected by permission checks.
+            // This avoids it disappearing if there is any mismatch while we debug.
+            renderUsersTable();
+        }
+
+        function handleLogin(event) {
+            event.preventDefault();
+            const email = document.getElementById('loginEmail').value.trim();
+            const password = document.getElementById('loginPassword').value;
+            const errorDiv = document.getElementById('loginError');
+
+            if (!auth) {
+                alert('Authentication is not configured. Please check Firebase setup.');
+                return;
+            }
+
+            auth.signInWithEmailAndPassword(email, password)
+                .then(() => {
+                    if (errorDiv) errorDiv.style.display = 'none';
+                    // onAuthStateChanged handler will take care of setting currentUser and UI
+                })
+                .catch((error) => {
+                    console.error('Login error:', error);
+                    if (errorDiv) errorDiv.textContent = 'Invalid email or password.'; 
+                    if (errorDiv) errorDiv.style.display = 'block';
+                });
+        }
+
+        function logout() {
+            if (!auth) {
+                currentUser = null;
+                applyInitialUiState();
+                return;
+            }
+            auth.signOut().catch((error) => {
+                console.error('Logout error:', error);
+            });
+        }
+
+        function renderUsersTable() {
+            const tbody = document.getElementById('usersTableBody');
+            if (!tbody) return;
+
+            // Only owner / users with manageUsers can see real data
+            if (!currentUser || !hasPermission('manageUsers')) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 15px;">Only the owner or users with "manage users" permission can view this section.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = '';
+            users.forEach((user, index) => {
+                if (!user) return;
+                const perms = user.permissions || {};
+                const permsText = Object.keys(perms)
+                    .filter(k => perms[k])
+                    .map(k => k.replace(/([A-Z])/g, ' $1').toLowerCase())
+                    .join(', ') || 'None';
+
+                const isOwner = user.role === 'owner';
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${user.email || '-'}</td>
+                    <td>${user.role || ''}</td>
+                    <td>${user.accessLevel || ''}</td>
+                    <td>${permsText}</td>
+                    <td>
+                        ${isOwner ? '<span style="font-size: 0.8rem; color: var(--text-light);">Owner</span>' : `
+                        <button class="btn btn-small btn-secondary" type="button" onclick="startEditUser(${index})">Edit</button>
+                        <button class="btn btn-small btn-danger" type="button" onclick="deleteUserAtIndex(${index})">Delete</button>
+                        `}
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function resetUserForm() {
+            const form = document.getElementById('userForm');
+            if (!form) return;
+            form.reset();
+            document.getElementById('editingUserIndex').value = '';
+            const title = document.getElementById('userFormTitle');
+            if (title) title.textContent = 'Add New User';
+        }
+
+        function saveUser(event) {
+            event.preventDefault();
+            if (!currentUser || !hasPermission('manageUsers')) {
+                alert('You do not have permission to manage users.');
+                return;
+            }
+
+            const email = document.getElementById('userUsername').value.trim();
+            const password = document.getElementById('userPassword').value;
+            const role = document.getElementById('userRole').value;
+            const accessLevel = document.getElementById('userAccessLevel').value;
+            const editingIndexValue = document.getElementById('editingUserIndex').value;
+            const editingIndex = editingIndexValue === '' ? null : parseInt(editingIndexValue, 10);
+
+            if (!email || !password || !role || !accessLevel) {
+                alert('Please fill in all required fields.');
+                return;
+            }
+
+            if (role === 'owner' && !email.toLowerCase().startsWith('owner')) {
+                const confirmOwner = confirm('You are creating another owner account. Owner accounts have full access to everything. Continue?');
+                if (!confirmOwner) return;
+            }
+
+            const permissions = {
+                viewRevenue: document.getElementById('permViewRevenue').checked,
+                exportData: document.getElementById('permExportData').checked,
+                viewPayments: document.getElementById('permViewPayments').checked,
+                managePatients: document.getElementById('permManagePatients').checked,
+                deletePatients: document.getElementById('permDeletePatients').checked,
+                managePackages: document.getElementById('permManagePackages').checked,
+                deletePackages: document.getElementById('permDeletePackages').checked,
+                manageUsers: document.getElementById('permManageUsers').checked
+            };
+
+            if (!auth) {
+                alert('Authentication is not configured. Please check Firebase setup.');
+                return;
+            }
+
+            if (editingIndex === null) {
+                if (users.some(u => u && u.email === email)) {
+                    alert('A user with this email already exists in roles.');
+                    return;
+                }
+
+                // Create auth user first, then store role information
+                auth.createUserWithEmailAndPassword(email, password)
+                    .then((cred) => {
+                        const uid = cred.user.uid;
+                        users.push({
+                            uid,
+                            email,
+                            role,
+                            accessLevel,
+                            permissions
+                        });
+                        ensureOwnerUser();
+                        persistUsers();
+                        renderUsersTable();
+                        resetUserForm();
+                        alert('User account created successfully.');
+                    })
+                    .catch((error) => {
+                        console.error('Error creating user:', error);
+                        alert(error.message || 'Failed to create user.');
+                    });
+            } else {
+                const existing = users[editingIndex];
+                if (!existing) return;
+                // Prevent removing last owner
+                const isChangingFromOwner = existing.role === 'owner' && role !== 'owner';
+                if (isChangingFromOwner) {
+                    const otherOwners = users.filter((u, idx) => u && u.role === 'owner' && idx !== editingIndex);
+                    if (otherOwners.length === 0) {
+                        alert('You cannot remove the only owner account. Create another owner first.');
+                        return;
+                    }
+                }
+
+                users[editingIndex] = {
+                    ...existing,
+                    email,
+                    role,
+                    accessLevel,
+                    permissions
+                };
+
+                persistUsers();
+                renderUsersTable();
+                resetUserForm();
+                alert('User updated successfully (role/permissions). To change passwords, use Firebase Authentication console.');
+            }
+        }
+
+        function startEditUser(index) {
+            const user = users[index];
+            if (!user) return;
+
+            document.getElementById('userUsername').value = user.email || '';
+            document.getElementById('userPassword').value = '';
+            document.getElementById('userRole').value = user.role || '';
+            document.getElementById('userAccessLevel').value = user.accessLevel || '';
+
+            const perms = user.permissions || {};
+            document.getElementById('permViewRevenue').checked = !!perms.viewRevenue;
+            document.getElementById('permExportData').checked = !!perms.exportData;
+            document.getElementById('permViewPayments').checked = !!perms.viewPayments;
+            document.getElementById('permManagePatients').checked = !!perms.managePatients;
+            document.getElementById('permDeletePatients').checked = !!perms.deletePatients;
+            document.getElementById('permManagePackages').checked = !!perms.managePackages;
+            document.getElementById('permDeletePackages').checked = !!perms.deletePackages;
+            document.getElementById('permManageUsers').checked = !!perms.manageUsers;
+
+            document.getElementById('editingUserIndex').value = index.toString();
+            const title = document.getElementById('userFormTitle');
+            if (title) title.textContent = 'Edit User';
+        }
+
+        function deleteUserAtIndex(index) {
+            if (!currentUser || !hasPermission('manageUsers')) {
+                alert('You do not have permission to manage users.');
+                return;
+            }
+
+            const user = users[index];
+            if (!user) return;
+            if (user.role === 'owner') {
+                alert('Owner accounts cannot be deleted from here. Create another owner and then change roles if needed.');
+                return;
+            }
+
+            if (!confirm(`Are you sure you want to delete user "${user.email || ''}"?`)) {
+                return;
+            }
+            
+            // Note: Deleting the Firebase Auth user itself must be done via Firebase console or secure backend.
+            users.splice(index, 1);
+            ensureOwnerUser();
+            persistUsers();
+            renderUsersTable();
+        }
+
+        // ==================== FIREBASE FUNCTIONS ====================
+        function initializeFirebase() {
+            console.log("🔄 Initializing Firebase real-time sync...");
+
+            // Listen for connection state
+            const connectedRef = database.ref('.info/connected');
+            connectedRef.on('value', (snap) => {
+                if (snap.val() === true) {
+                    updateConnectionStatus(true);
+                    console.log("✅ Connected to Firebase");
+                } else {
+                    updateConnectionStatus(false);
+                    console.log("⚠️ Disconnected from Firebase");
+                }
+            });
+
+            // Load and sync patients
+            database.ref('patients').on('value', (snapshot) => {
+                const data = snapshot.val();
+                patients = data ? Object.values(data) : [];
+                updateDashboard();
+                renderPatients();
+                console.log(`📊 Loaded ${patients.length} patients from cloud`);
+            });
+
+            // Load and sync visits
+            database.ref('visits').on('value', (snapshot) => {
+                const data = snapshot.val();
+                visits = data ? Object.values(data) : [];
+                renderVisits();
+                console.log(`📅 Loaded ${visits.length} visits from cloud`);
+            });
+
+            // Load and sync packages
+            database.ref('packages').on('value', (snapshot) => {
+                const data = snapshot.val();
+                if (data) {
+                    packages = Object.values(data);
+                } else {
+                    // Initialize default packages
+                    packages = getDefaultPackages();
+                    savePackagesToStorage();
+                }
+                displayPackages();
+                populatePackageDropdown();
+                console.log(`📦 Loaded ${packages.length} packages from cloud`);
+            });
+
+            // Load and sync user accounts (roles & permissions, not passwords)
+            database.ref('security/users').on('value', (snapshot) => {
+                const data = snapshot.val();
+                console.log('📥 Raw users data from Firebase:', data);
+                
+                if (!data) {
+                    users = [];
+                } else if (Array.isArray(data)) {
+                    users = data.filter(u => u !== null && u !== undefined);
+                } else if (typeof data === 'object') {
+                    // Convert object to array - handle both formats:
+                    // Format 1: { "owner": { email: "...", role: "owner", ... } }
+                    // Format 2: { "0": { email: "...", role: "owner", ... } }
+                    users = Object.values(data).filter(u => u !== null && u !== undefined);
+                }
+                
+                console.log('✅ Processed users array:', users);
+
+                ensureOwnerUser();
+
+                // If someone is already logged in, refresh their role/permissions from the latest users list
+                if (auth && auth.currentUser) {
+                    const fbUser = auth.currentUser;
+                    console.log('🔍 Looking for role entry for:', fbUser.email);
+                    const roleEntry = users.find(u => u && (u.uid === fbUser.uid || u.email === fbUser.email));
+                    console.log('🎯 Found role entry:', roleEntry);
+                    
+                    currentUser = {
+                        uid: fbUser.uid,
+                        email: fbUser.email,
+                        role: roleEntry ? roleEntry.role : 'staff',
+                        accessLevel: roleEntry ? roleEntry.accessLevel : 'low',
+                        permissions: roleEntry ? roleEntry.permissions : getDefaultPermissionsForRole('staff')
+                    };
+                    
+                    console.log('👤 Current user set to:', currentUser);
+                }
+
+                applyInitialUiState();
+            });
+
+            hideLoading();
+        }
+
+        function updateConnectionStatus(isConnected) {
+            const statusDiv = document.getElementById('connectionStatus');
+            const statusDot = document.getElementById('statusDot');
+            const statusText = document.getElementById('statusText');
+
+            if (isConnected) {
+                statusDiv.className = 'connection-status online';
+                statusDot.className = 'status-dot online';
+                statusText.textContent = '☁️ Cloud Synced';
+            } else {
+                statusDiv.className = 'connection-status offline';
+                statusDot.className = 'status-dot offline';
+                statusText.textContent = '📴 Offline - Will sync when online';
+            }
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingOverlay').classList.add('hidden');
+        }
+
+        function getDefaultPackages() {
+            return [
+                { name: "Full Body - 12 Sessions", area: "Full Body", sessions: 12, price: 3600 },
+                { name: "Full Body - 8 Sessions", area: "Full Body", sessions: 8, price: 2800 },
+                { name: "Face & Neck - 6 Sessions", area: "Face & Neck", sessions: 6, price: 1800 },
+                { name: "Underarms - 6 Sessions", area: "Underarms", sessions: 6, price: 900 },
+                { name: "Brazilian - 8 Sessions", area: "Brazilian", sessions: 8, price: 2400 },
+                { name: "Full Legs - 8 Sessions", area: "Full Legs", sessions: 8, price: 2400 },
+                { name: "Full Arms - 6 Sessions", area: "Full Arms", sessions: 6, price: 1500 }
+            ];
+        }
+
+        // ==================== STORAGE FUNCTIONS ====================
+
+        function loadData() {
+            const savedPatients = localStorage.getItem('noubel_patients');
+            const savedVisits = localStorage.getItem('noubel_visits');
+            const savedPackages = localStorage.getItem('noubel_packages');
+            
+            if (savedPatients) patients = JSON.parse(savedPatients);
+            if (savedVisits) visits = JSON.parse(savedVisits);
+            
+            if (savedPackages) {
+                packages = JSON.parse(savedPackages);
+            } else {
+                packages = getDefaultPackages();
+                localStorage.setItem('noubel_packages', JSON.stringify(packages));
+            }
+        }
+
+        function saveData() {
+            if (isFirebaseConfigured) {
+                // Save to Firebase - real-time cloud sync
+                database.ref('patients').set(patients).then(() => {
+                    console.log("✅ Patients synced to cloud");
+                }).catch((error) => {
+                    console.error("❌ Error syncing patients:", error);
+                    alert("Failed to sync to cloud. Check your internet connection.");
+                });
+                
+                database.ref('visits').set(visits).then(() => {
+                    console.log("✅ Visits synced to cloud");
+                }).catch((error) => {
+                    console.error("❌ Error syncing visits:", error);
+                });
+            } else {
+                // Save to localStorage (demo mode)
+                localStorage.setItem('noubel_patients', JSON.stringify(patients));
+                localStorage.setItem('noubel_visits', JSON.stringify(visits));
+            }
+        }
+
+        function savePackagesToStorage() {
+            if (isFirebaseConfigured) {
+                database.ref('packages').set(packages).then(() => {
+                    console.log("✅ Packages synced to cloud");
+                }).catch((error) => {
+                    console.error("❌ Error syncing packages:", error);
+                });
+            } else {
+                localStorage.setItem('noubel_packages', JSON.stringify(packages));
+            }
+        }
+
+        function setTodayDate() {
+            const today = new Date().toISOString().split('T')[0];
+            const regDate = document.getElementById('registrationDate');
+            const pkgStart = document.getElementById('packageStartDate');
+            if (regDate) regDate.value = today;
+            if (pkgStart) pkgStart.value = today;
+            document.getElementById('visitDate').value = today;
+            document.getElementById('extraVisitDate').value = today;
+        }
+
+        function switchTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Remove active from all buttons
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            // Show selected tab
+            document.getElementById(tabName).classList.add('active');
+            const clickedBtn = typeof arguments[1] !== 'undefined' ? arguments[1] : document.querySelector(`.tab-btn[data-tab="${tabName}"]`);
+            if (clickedBtn) clickedBtn.classList.add('active');
+
+            // Update patient dropdowns
+            if (tabName === 'visits') {
+                populatePatientDropdown();
+            }
+            if (tabName === 'extra-sessions') {
+                populateExtraPatientDropdown();
+            }
+        }
+
+        function populatePackageDropdown() {
+            const select = document.getElementById('packageType');
+            select.innerHTML = '<option value="">Select package...</option>';
+            packages.forEach(pkg => {
+                const option = document.createElement('option');
+                option.value = pkg.name;
+                option.textContent = `${pkg.name} - ${pkg.price} AED`;
+                option.dataset.sessions = pkg.sessions;
+                option.dataset.price = pkg.price;
+                select.appendChild(option);
+            });
+        }
+
+        function updatePackagePrice() {
+            const select = document.getElementById('packageType');
+            const selectedOption = select.options[select.selectedIndex];
+            
+            if (selectedOption.value) {
+                const sessions = selectedOption.dataset.sessions;
+                const price = selectedOption.dataset.price;
+                
+                document.getElementById('totalSessions').value = sessions;
+                document.getElementById('packagePrice').value = price;
+                document.getElementById('amountPaid').value = price;
+                
+                // Update installment fields if visible
+                const initialPayment = document.getElementById('initialPayment');
+                if (initialPayment.value) {
+                    updateRemainingBalance();
+                }
+            }
+        }
+
+        function togglePaymentFields() {
+            const isFull = document.getElementById('paymentFull').checked;
+            const fullFields = document.getElementById('fullPaymentFields');
+            const installmentFields = document.getElementById('installmentFields');
+            const packagePrice = document.getElementById('packagePrice').value;
+            
+            if (isFull) {
+                fullFields.style.display = 'block';
+                installmentFields.style.display = 'none';
+                document.getElementById('amountPaid').value = packagePrice;
+                document.getElementById('initialPayment').value = '';
+                document.getElementById('remainingBalance').value = '';
+                const methodSelect = document.getElementById('installmentMethod');
+                if (methodSelect) methodSelect.value = '';
+            } else {
+                fullFields.style.display = 'none';
+                installmentFields.style.display = 'block';
+                document.getElementById('amountPaid').value = '';
+            }
+        }
+
+        function updateRemainingBalance() {
+            const packagePrice = parseFloat(document.getElementById('packagePrice').value) || 0;
+            const initialPayment = parseFloat(document.getElementById('initialPayment').value) || 0;
+            const remaining = packagePrice - initialPayment;
+            document.getElementById('remainingBalance').value = remaining.toFixed(2);
+        }
+
+        // Add event listener for initial payment
+        document.addEventListener('DOMContentLoaded', function() {
+            const initialPaymentField = document.getElementById('initialPayment');
+            if (initialPaymentField) {
+                initialPaymentField.addEventListener('input', updateRemainingBalance);
+            }
+        });
+
+        function populatePatientDropdown() {
+            const select = document.getElementById('visitPatient');
+            select.innerHTML = '<option value="">Select patient...</option>';
+            
+            patients.forEach((patient, index) => {
+                const option = document.createElement('option');
+                option.value = index;
+                option.textContent = `${patient.fileNumber} - ${patient.name}`;
+                select.appendChild(option);
+            });
+        }
+
+        function populateExtraPatientDropdown() {
+            const select = document.getElementById('extraPatient');
+            select.innerHTML = '<option value="">Select patient...</option>';
+            
+            patients.forEach((patient, index) => {
+                const option = document.createElement('option');
+                option.value = index;
+                option.textContent = `${patient.fileNumber} - ${patient.name}`;
+                select.appendChild(option);
+            });
+        }
+
+        function updateSessionInfo() {
+            const patientIndex = document.getElementById('visitPatient').value;
+            const sessionDisplay = document.getElementById('currentSessionDisplay');
+            const warningDiv = document.getElementById('sessionWarning');
+            const submitBtn = document.getElementById('recordVisitBtn');
+            const paymentSection = document.getElementById('paymentCollectionSection');
+            const paymentDueInfo = document.getElementById('paymentDueInfo');
+            
+            if (!patientIndex) {
+                sessionDisplay.value = 'Select a patient first';
+                warningDiv.style.display = 'none';
+                paymentSection.style.display = 'none';
+                submitBtn.disabled = false;
+                return;
+            }
+
+            const patient = patients[patientIndex];
+            const nextSession = patient.sessionsCompleted + 1;
+            
+            if (patient.sessionsCompleted >= patient.totalSessions) {
+                sessionDisplay.value = `All sessions completed (${patient.totalSessions}/${patient.totalSessions})`;
+                warningDiv.style.display = 'block';
+                paymentSection.style.display = 'none';
+                submitBtn.disabled = true;
+            } else {
+                sessionDisplay.value = `Session ${nextSession} of ${patient.totalSessions}`;
+                warningDiv.style.display = 'none';
+                submitBtn.disabled = false;
+                
+                // Show payment collection if installment
+                if (patient.paymentStatus === 'Installment' && patient.remainingBalance > 0) {
+                    paymentSection.style.display = 'block';
+                    paymentDueInfo.textContent = `Remaining Balance: ${patient.remainingBalance.toFixed(2)} AED`;
+                } else {
+                    paymentSection.style.display = 'none';
+                }
+            }
+        }
+
+        function updateExtraSessionInfo() {
+            const patientIndex = document.getElementById('extraPatient').value;
+            const sessionDisplay = document.getElementById('extraSessionNumber');
+            
+            if (!patientIndex) {
+                sessionDisplay.value = 'Select a patient first';
+                return;
+            }
+
+            const patient = patients[patientIndex];
+            const extraNumber = patient.extraSessions + 1;
+            sessionDisplay.value = `Extra Session #${extraNumber}`;
+        }
+
+        function addPatient(event) {
+            event.preventDefault();
+            
+            const isFull = document.getElementById('paymentFull').checked;
+            const packagePrice = parseFloat(document.getElementById('packagePrice').value);
+            const installmentMethodSelect = document.getElementById('installmentMethod');
+            const selectedInstallmentMethod = installmentMethodSelect ? installmentMethodSelect.value : '';
+            let amountPaid, remainingBalance, paymentStatus;
+            
+            if (isFull) {
+                amountPaid = packagePrice;
+                remainingBalance = 0;
+                paymentStatus = 'Paid in Full';
+            } else {
+                if (!selectedInstallmentMethod) {
+                    alert('Please select an installment method (Tabby, Tamara, or Cash).');
+                    return;
+                }
+                amountPaid = parseFloat(document.getElementById('initialPayment').value) || 0;
+                remainingBalance = packagePrice - amountPaid;
+                paymentStatus = 'Installment';
+            }
+            
+            const patient = {
+            emiratesId: getEmiratesIdFromParts('emiratesId'),
+                fileNumber: document.getElementById('fileNumber').value,
+                name: document.getElementById('patientName').value,
+                phone: document.getElementById('phoneNumber').value,
+                package: document.getElementById('packageType').value,
+                totalSessions: parseInt(document.getElementById('totalSessions').value),
+                sessionsCompleted: 0,
+                packagePrice: packagePrice,
+                amountPaid: amountPaid,
+                remainingBalance: remainingBalance,
+                paymentStatus: paymentStatus,
+                registrationDate: document.getElementById('registrationDate').value,
+                packageStartDate: document.getElementById('packageStartDate').value,
+                packageEndDate: document.getElementById('packageEndDate').value,
+                lastVisit: '',
+                status: 'Active',
+                notes: document.getElementById('notes').value,
+                extraSessions: 0,
+                extraSessionCost: 0,
+                installmentMethod: isFull ? null : selectedInstallmentMethod,
+                paymentHistory: [{
+                    date: document.getElementById('registrationDate').value,
+                    amount: amountPaid,
+                type: isFull ? 'Initial Payment (Full Payment)' : `Initial Payment (Installment - ${selectedInstallmentMethod})`
+                }]
+            };
+
+            patients.push(patient);
+            saveData();
+            
+            document.getElementById('addPatientForm').reset();
+            setTodayDate();
+            togglePaymentFields(); // Reset to full payment view
+            
+            updateDashboard();
+            renderPatients();
+            switchTab('patients');
+            if (amountPaid > 0) {
+                const paymentTypeLabel = paymentStatus === 'Installment'
+                    ? `Initial Payment (Installment - ${selectedInstallmentMethod})`
+                    : 'Full Payment (Cash)';
+                showPaymentSuccessModal(patient, amountPaid, paymentTypeLabel, patient.registrationDate, patient.package);
+            } else {
+                alert('Patient added successfully!');
+            }
+        }
+
+        function recordVisit(event) {
+            event.preventDefault();
+            
+            const patientIndex = document.getElementById('visitPatient').value;
+            if (!patientIndex) {
+                alert('Please select a patient');
+                return;
+            }
+
+            const patient = patients[patientIndex];
+            
+            // Check if patient has completed all sessions
+            if (patient.sessionsCompleted >= patient.totalSessions) {
+                alert('This patient has completed all scheduled sessions. Please use the "Extra Sessions" tab to add additional sessions.');
+                return;
+            }
+
+            const sessionNumber = patient.sessionsCompleted + 1;
+            
+            // Handle installment payment if applicable
+            const installmentPayment = parseFloat(document.getElementById('installmentPayment').value) || 0;
+            if (installmentPayment > 0) {
+                if (installmentPayment > patient.remainingBalance) {
+                    alert(`Payment amount (${installmentPayment} AED) exceeds remaining balance (${patient.remainingBalance.toFixed(2)} AED)`);
+                    return;
+                }
+                
+                patient.amountPaid += installmentPayment;
+                patient.remainingBalance -= installmentPayment;
+                
+                if (!patient.paymentHistory) patient.paymentHistory = [];
+                patient.paymentHistory.push({
+                    date: document.getElementById('visitDate').value,
+                    amount: installmentPayment,
+                    type: `Installment Payment - ${(patient.installmentMethod || 'Cash')}`
+                });
+                
+                if (patient.remainingBalance <= 0) {
+                    patient.paymentStatus = 'Paid in Full';
+                    patient.remainingBalance = 0;
+                }
+            }
+            
+            const visit = {
+                patientIndex: parseInt(patientIndex),
+                fileNumber: patient.fileNumber,
+                patientName: patient.name,
+                date: document.getElementById('visitDate').value,
+                sessionNumber: sessionNumber,
+                technician: document.getElementById('technicianName').value,
+                extraSession: 'No',
+                amount: 0,
+                installmentCollected: installmentPayment,
+                notes: document.getElementById('visitNotes').value
+            };
+
+            visits.push(visit);
+
+            // Update patient record
+            patient.sessionsCompleted++;
+            patient.lastVisit = visit.date;
+            
+            if (patient.sessionsCompleted >= patient.totalSessions) {
+                patient.status = 'Completed';
+            }
+
+            saveData();
+            
+            document.getElementById('recordVisitForm').reset();
+            document.getElementById('installmentPayment').value = 0;
+            setTodayDate();
+            
+            updateDashboard();
+            renderPatients();
+            renderVisits();
+            updateSessionInfo();
+            if (installmentPayment > 0) {
+                const methodLabel = patient.installmentMethod || 'Cash';
+                showPaymentSuccessModal(patient, installmentPayment, `Installment Payment - ${methodLabel}`, visit.date, `Session ${sessionNumber} of ${patient.totalSessions}`);
+            } else {
+                alert(`Visit recorded successfully! Session ${sessionNumber} of ${patient.totalSessions}`);
+            }
+        }
+
+        function recordExtraSession(event) {
+            event.preventDefault();
+            
+            const patientIndex = document.getElementById('extraPatient').value;
+            if (!patientIndex) {
+                alert('Please select a patient');
+                return;
+            }
+
+            const patient = patients[patientIndex];
+            const extraSessionNumber = patient.extraSessions + 1;
+            const amount = parseFloat(document.getElementById('extraAmount').value);
+            
+            const visit = {
+                patientIndex: parseInt(patientIndex),
+                fileNumber: patient.fileNumber,
+                patientName: patient.name,
+                date: document.getElementById('extraVisitDate').value,
+                sessionNumber: patient.totalSessions + extraSessionNumber,
+                technician: document.getElementById('extraTechnician').value,
+                extraSession: 'Yes',
+                amount: amount,
+                notes: document.getElementById('extraNotes').value
+            };
+
+            visits.push(visit);
+
+            // Update patient record
+            patient.extraSessions++;
+            patient.extraSessionCost += amount;
+            patient.lastVisit = visit.date;
+
+            saveData();
+            
+            document.getElementById('extraSessionForm').reset();
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('extraVisitDate').value = today;
+            
+            updateDashboard();
+            renderPatients();
+            renderVisits();
+            updateExtraSessionInfo();
+            showPaymentSuccessModal(patient, amount, 'Extra Session', visit.date, `Extra Session #${extraSessionNumber}`);
+        }
+
+        function updateDashboard() {
+            // Calculate stats
+            const totalPatients = patients.length;
+            const activePatients = patients.filter(p => p.status === 'Active').length;
+            const totalRevenue = patients.reduce((sum, p) => sum + p.amountPaid + (p.extraSessionCost || 0), 0);
+            const sessionsCompleted = patients.reduce((sum, p) => sum + p.sessionsCompleted, 0);
+
+            // Update stats
+            document.getElementById('totalPatients').textContent = totalPatients;
+            document.getElementById('activePatients').textContent = activePatients;
+            document.getElementById('totalRevenue').textContent = totalRevenue.toLocaleString() + ' AED';
+            document.getElementById('sessionsCompleted').textContent = sessionsCompleted;
+
+            // Update dashboard table
+            const tbody = document.getElementById('dashboardTableBody');
+            tbody.innerHTML = '';
+
+            patients.slice(-5).reverse().forEach(patient => {
+                const progress = (patient.sessionsCompleted / patient.totalSessions * 100).toFixed(0);
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${patient.fileNumber}</td>
+                    <td>${patient.name}</td>
+                    <td>${patient.package}</td>
+                    <td>
+                        <div class="progress-container">
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: ${progress}%"></div>
+                            </div>
+                            <div class="progress-text">${patient.sessionsCompleted}/${patient.totalSessions} sessions</div>
+                        </div>
+                    </td>
+                    <td><span class="badge badge-${patient.status.toLowerCase()}">${patient.status}</span></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function renderPatients() {
+            const tbody = document.getElementById('patientsTableBody');
+            tbody.innerHTML = '';
+
+            const filteredPatients = getFilteredPatients();
+
+            filteredPatients.forEach((patient, index) => {
+                const tr = document.createElement('tr');
+                const sessionsRemaining = patient.totalSessions - patient.sessionsCompleted;
+                const actualIndex = patients.indexOf(patient);
+                
+                // Payment status display
+                let paymentBadge = '';
+                if (patient.paymentStatus === 'Paid in Full') {
+                    paymentBadge = '<span class="badge badge-active" style="margin-left: 5px;">Paid</span>';
+                } else if (patient.remainingBalance > 0) {
+                    paymentBadge = `<span class="badge badge-pending" style="margin-left: 5px;">Balance: ${patient.remainingBalance.toFixed(0)} AED</span>`;
+                }
+                
+                tr.innerHTML = `
+                    <td>${patient.fileNumber}</td>
+                    <td>${patient.emiratesId}</td>
+                    <td>${patient.name}</td>
+                    <td>${patient.phone}</td>
+                    <td>${patient.package}</td>
+                    <td>${patient.sessionsCompleted}/${patient.totalSessions} (${sessionsRemaining} left)</td>
+                    <td>${patient.amountPaid.toLocaleString()} AED${paymentBadge}</td>
+                    <td><span class="badge badge-${patient.status.toLowerCase()}">${patient.status}</span></td>
+                    <td>
+                        <div class="actions">
+                            <button class="action-btn view-btn" onclick="viewPatient(${actualIndex})">View</button>
+                            <button class="action-btn edit-btn" onclick="requestEditPatient(${actualIndex})">Edit</button>
+                            <button class="action-btn delete-btn" onclick="requestDeletePatient(${actualIndex})">Delete</button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function requestEditPatient(index) {
+            requirePermission('managePatients', () => {
+                showPasswordModal(
+                    'Please re-enter your password to edit patient details:',
+                    () => editPatient(index)
+                );
+            });
+        }
+
+        function editPatient(index) {
+            const patient = patients[index];
+            setEmiratesIdParts('editEmiratesId', patient.emiratesId);
+            document.getElementById('editFileNumber').value = patient.fileNumber;
+            document.getElementById('editPatientName').value = patient.name;
+            document.getElementById('editPhoneNumber').value = patient.phone;
+            document.getElementById('editNotes').value = patient.notes || '';
+            document.getElementById('editPatientIndex').value = index;
+            document.getElementById('editPatientModal').classList.add('active');
+        }
+
+        function closeEditPatientModal() {
+            document.getElementById('editPatientModal').classList.remove('active');
+        }
+
+        // Invoice / Payment Success Modal
+        function showPaymentSuccessModal(patient, amount, paymentType, date, description) {
+            lastPaymentInvoiceData = { patient, amount, paymentType, date, description };
+            document.getElementById('paymentSuccessDetails').innerHTML = `
+                <strong>Patient:</strong> ${patient.name} (${patient.fileNumber})<br>
+                <strong>Amount:</strong> ${amount.toLocaleString()} AED<br>
+                <strong>Payment Type:</strong> ${paymentType}<br>
+                <strong>Date:</strong> ${date}${description ? '<br><strong>Description:</strong> ' + description : ''}
+            `;
+            document.getElementById('paymentSuccessModal').classList.add('active');
+        }
+
+        function closePaymentSuccessModal() {
+            document.getElementById('paymentSuccessModal').classList.remove('active');
+            lastPaymentInvoiceData = null;
+        }
+
+        function printPaymentInvoice(patient, amount, paymentType, date, description) {
+            const invoiceNumber = 'INV-' + new Date().toISOString().replace(/[-:]/g, '').slice(0, 15);
+            const printDate = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+            const invoiceHtml = `<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Payment Receipt - Noubel Medical Centre</title>
+<style>
+body{font-family:'Segoe UI',Arial,sans-serif;padding:30px;max-width:400px;margin:0 auto;color:#333;}
+.header{text-align:center;border-bottom:2px solid #1a4d5e;padding-bottom:15px;margin-bottom:25px;}
+.clinic-name{font-size:22px;font-weight:700;color:#1a4d5e;}
+.receipt-title{font-size:14px;color:#6c757d;margin-top:5px;}
+.invoice-num{text-align:right;font-size:12px;color:#6c757d;margin-bottom:20px;}
+.section{margin:15px 0;}
+.section-title{font-weight:600;color:#1a4d5e;margin-bottom:8px;}
+.row{display:flex;justify-content:space-between;margin:6px 0;font-size:14px;}
+.amount-box{background:#f8f9fa;padding:20px;border-radius:8px;margin:20px 0;text-align:center;}
+.amount-label{font-size:12px;color:#6c757d;}
+.amount-value{font-size:28px;font-weight:700;color:#1a4d5e;}
+.footer{text-align:center;margin-top:30px;padding-top:20px;border-top:1px solid #ddd;font-size:12px;color:#6c757d;}
+@media print{body{padding:20px;}}
+</style></head><body>
+<div class="header"><div class="clinic-name">Noubel Medical Centre</div><div class="receipt-title">PAYMENT RECEIPT</div></div>
+<div class="invoice-num">Invoice #${invoiceNumber}</div>
+<div class="invoice-num">${printDate}</div>
+<div class="section"><div class="section-title">Patient Details</div>
+<div class="row"><span>Name:</span><span>${patient.name}</span></div>
+<div class="row"><span>File No:</span><span>${patient.fileNumber}</span></div>
+<div class="row"><span>Emirates ID:</span><span>${patient.emiratesId || '-'}</span></div>
+<div class="row"><span>Phone:</span><span>${patient.phone || '-'}</span></div>
+</div>
+<div class="section"><div class="section-title">Payment Details</div>
+<div class="row"><span>Payment Type:</span><span>${paymentType}</span></div>
+<div class="row"><span>Date:</span><span>${date}</span></div>
+${description ? '<div class="row"><span>Description:</span><span>' + description + '</span></div>' : ''}
+</div>
+<div class="amount-box"><div class="amount-label">Amount Received</div><div class="amount-value">${amount.toLocaleString()} AED</div></div>
+<div class="footer">Thank you for your payment.<br>Noubel Medical Centre - Laser Therapy</div>
+</body></html>`;
+            const printWin = window.open('', '_blank');
+            printWin.document.write(invoiceHtml);
+            printWin.document.close();
+            printWin.focus();
+            printWin.print();
+            printWin.close();
+        }
+
+        function printLastInvoice() {
+            if (lastPaymentInvoiceData) {
+                const { patient, amount, paymentType, date, description } = lastPaymentInvoiceData;
+                printPaymentInvoice(patient, amount, paymentType, date, description);
+            }
+        }
+
+        function savePatientEdit(event) {
+            event.preventDefault();
+            
+            const index = parseInt(document.getElementById('editPatientIndex').value);
+            const patient = patients[index];
+            
+            patient.emiratesId = getEmiratesIdFromParts('editEmiratesId');
+            patient.fileNumber = document.getElementById('editFileNumber').value;
+            patient.name = document.getElementById('editPatientName').value;
+            patient.phone = document.getElementById('editPhoneNumber').value;
+            patient.notes = document.getElementById('editNotes').value;
+
+            saveData();
+            closeEditPatientModal();
+            renderPatients();
+            
+            alert('Patient details updated successfully!');
+        }
+
+        function requestDeletePatient(index) {
+            requirePermission('deletePatients', () => {
+                showPasswordModal(
+                    'Please re-enter your password to delete this patient record:',
+                    () => deletePatient(index)
+                );
+            });
+        }
+
+        function getFilteredPatients() {
+            const searchTerm = document.getElementById('searchPatient').value.toLowerCase();
+            const statusFilter = document.getElementById('statusFilter').value;
+
+            return patients.filter(patient => {
+                const matchesSearch = patient.name.toLowerCase().includes(searchTerm) ||
+                                    patient.fileNumber.toLowerCase().includes(searchTerm) ||
+                                    patient.emiratesId.toLowerCase().includes(searchTerm);
+                
+                const matchesStatus = !statusFilter || patient.status === statusFilter;
+
+                return matchesSearch && matchesStatus;
+            });
+        }
+
+        function filterPatients() {
+            renderPatients();
+        }
+
+        function viewPatient(index) {
+            const patient = patients[index];
+            const patientVisits = visits.filter(v => v.patientIndex === index);
+            
+            const modalBody = document.getElementById('modalBody');
+            const sessionsRemaining = patient.totalSessions - patient.sessionsCompleted;
+            const progress = (patient.sessionsCompleted / patient.totalSessions * 100).toFixed(0);
+            
+            // Payment status
+            let paymentStatusHTML = '';
+            const installmentMethodLabel = patient.installmentMethod || (patient.paymentStatus === 'Installment' ? 'Cash' : '');
+            if (patient.paymentStatus === 'Installment' && patient.remainingBalance > 0) {
+                paymentStatusHTML = `
+                    <div style="margin-top: 20px; padding: 15px; background: #fff3cd; border-radius: 8px;">
+                        <strong style="color: #856404;">💰 Payment Status: Installment Plan${installmentMethodLabel ? ' - ' + installmentMethodLabel : ''}</strong><br>
+                        <div style="margin-top: 10px;">
+                            Package Price: ${patient.packagePrice?.toLocaleString() || patient.amountPaid.toLocaleString()} AED<br>
+                            Amount Paid: ${patient.amountPaid.toLocaleString()} AED<br>
+                            <strong style="color: #dc3545;">Remaining Balance: ${patient.remainingBalance.toFixed(2)} AED</strong>
+                        </div>
+                    </div>
+                `;
+            } else {
+                paymentStatusHTML = `
+                    <div style="margin-top: 20px; padding: 15px; background: #d4edda; border-radius: 8px;">
+                        <strong style="color: #155724;">✅ Payment Status: Paid in Full${installmentMethodLabel ? ' - ' + installmentMethodLabel : ''}</strong>
+                    </div>
+                `;
+            }
+
+            // Payment history
+            let paymentHistoryHTML = '';
+            if (patient.paymentHistory && patient.paymentHistory.length > 0) {
+                const patientIdx = patients.indexOf(patient);
+                paymentHistoryHTML = `
+                    <div style="margin-top: 20px;">
+                        <strong>Payment History:</strong>
+                        <table style="margin-top: 10px; width: 100%;">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Type</th>
+                                    <th>Amount</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${patient.paymentHistory.map((p, i) => `
+                                    <tr>
+                                        <td>${p.date}</td>
+                                        <td>${p.type}</td>
+                                        <td>${p.amount.toLocaleString()} AED</td>
+                                        <td><button class="btn btn-small btn-secondary" onclick="printPaymentInvoiceForHistory(${patientIdx}, ${i})" style="padding: 4px 10px; font-size: 0.8rem;">🖨️ Print</button></td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            }
+            
+            modalBody.innerHTML = `
+                <div class="form-grid">
+                    <div><strong>File Number:</strong> ${patient.fileNumber}</div>
+                    <div><strong>Emirates ID:</strong> ${patient.emiratesId}</div>
+                    <div><strong>Name:</strong> ${patient.name}</div>
+                    <div><strong>Phone:</strong> ${patient.phone}</div>
+                    <div><strong>Package:</strong> ${patient.package}</div>
+                    <div><strong>Total Sessions:</strong> ${patient.totalSessions}</div>
+                    <div><strong>Sessions Completed:</strong> ${patient.sessionsCompleted}</div>
+                    <div><strong>Sessions Remaining:</strong> ${sessionsRemaining}</div>
+                    <div><strong>Package Price:</strong> ${patient.packagePrice?.toLocaleString() || patient.amountPaid.toLocaleString()} AED</div>
+                    <div><strong>Amount Paid:</strong> ${patient.amountPaid.toLocaleString()} AED</div>
+                    <div><strong>Extra Sessions:</strong> ${patient.extraSessions}</div>
+                    <div><strong>Extra Cost:</strong> ${patient.extraSessionCost.toLocaleString()} AED</div>
+                    <div><strong>Registration Date:</strong> ${patient.registrationDate}</div>
+                    <div><strong>Package Start Date:</strong> ${patient.packageStartDate || 'N/A'}</div>
+                    <div><strong>Package End Date:</strong> ${patient.packageEndDate || 'N/A'}</div>
+                    <div><strong>Last Visit:</strong> ${patient.lastVisit || 'N/A'}</div>
+                    <div><strong>Status:</strong> <span class="badge badge-${patient.status.toLowerCase()}">${patient.status}</span></div>
+                </div>
+                
+                ${paymentStatusHTML}
+                
+                <div style="margin-top: 20px;">
+                    <strong>Progress:</strong>
+                    <div class="progress-container">
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: ${progress}%"></div>
+                        </div>
+                        <div class="progress-text">${patient.sessionsCompleted}/${patient.totalSessions} sessions (${progress}%)</div>
+                    </div>
+                </div>
+
+                ${paymentHistoryHTML}
+
+                ${patient.notes ? `<div style="margin-top: 20px;"><strong>Notes:</strong><br>${patient.notes}</div>` : ''}
+
+                ${patientVisits.length > 0 ? `
+                    <div style="margin-top: 20px;">
+                        <strong>Visit History:</strong>
+                        <table style="margin-top: 10px; width: 100%;">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Session #</th>
+                                    <th>Type</th>
+                                    <th>Payment Collected</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${patientVisits.map(v => {
+                                    const paymentAmount = v.installmentCollected || v.amount || 0;
+                                    const paymentType = v.extraSession === 'Yes' ? 'Extra Session' : 'Installment Payment';
+                                    const desc = v.extraSession === 'Yes' ? 'Extra Session' : 'Session ' + v.sessionNumber + ' of ' + patient.totalSessions;
+                                    const patIdx = patients.indexOf(patient);
+                                    return `<tr>
+                                        <td>${v.date}</td>
+                                        <td>${v.sessionNumber}</td>
+                                        <td>${v.extraSession === 'Yes' ? 'Extra' : 'Regular'}</td>
+                                        <td>${paymentAmount.toLocaleString()} AED</td>
+                                        <td>${paymentAmount > 0 ? `<button class="btn btn-small btn-secondary" onclick="printPaymentInvoice(patients[${patIdx}], ${paymentAmount}, '${paymentType}', '${v.date}', '${desc}')" style="padding: 4px 10px; font-size: 0.8rem;">🖨️ Print</button>` : ''}</td>
+                                    </tr>`;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                ` : ''}
+            `;
+            
+            document.getElementById('patientModal').classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('patientModal').classList.remove('active');
+        }
+
+        function deletePatient(index) {
+            if (confirm('Are you sure you want to delete this patient record?')) {
+                patients.splice(index, 1);
+                // Also remove associated visits
+                visits = visits.filter(v => v.patientIndex !== index);
+                // Update remaining visit indices
+                visits.forEach(v => {
+                    if (v.patientIndex > index) v.patientIndex--;
+                });
+                
+                saveData();
+                updateDashboard();
+                renderPatients();
+                renderVisits();
+            }
+        }
+
+        function renderVisits() {
+            const tbody = document.getElementById('visitsTableBody');
+            tbody.innerHTML = '';
+
+            visits.slice().reverse().forEach(visit => {
+                const tr = document.createElement('tr');
+                const visitType = visit.extraSession === 'Yes' ? 
+                    '<span class="badge badge-pending">Extra</span>' : 
+                    '<span class="badge badge-active">Regular</span>';
+                
+                tr.innerHTML = `
+                    <td>${visit.date}</td>
+                    <td>${visit.fileNumber}</td>
+                    <td>${visit.patientName}</td>
+                    <td>${visit.sessionNumber}</td>
+                    <td>${visitType}</td>
+                    <td>${(visit.amount || visit.installmentCollected || 0)} AED</td>
+                    <td>${visit.technician || 'N/A'}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function displayPackages() {
+            const tbody = document.getElementById('packagesTableBody');
+            tbody.innerHTML = '';
+            
+            packages.forEach((pkg, index) => {
+                const tr = document.createElement('tr');
+                const pricePerSession = (pkg.price / pkg.sessions).toFixed(2);
+                tr.innerHTML = `
+                    <td>${pkg.name}</td>
+                    <td>${pkg.area}</td>
+                    <td>${pkg.sessions}</td>
+                    <td>${pkg.price.toLocaleString()} AED</td>
+                    <td>${pricePerSession} AED</td>
+                    <td>
+                        <div class="actions">
+                            <button class="action-btn edit-btn" onclick="requestEditPackage(${index})">Edit</button>
+                            <button class="action-btn delete-btn" onclick="requestDeletePackage(${index})">Delete</button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Password Protection Functions
+        function showPasswordModal(prompt, action) {
+            pendingAction = action;
+            document.getElementById('passwordPrompt').textContent = prompt;
+            document.getElementById('passwordInput').value = '';
+            document.getElementById('passwordError').style.display = 'none';
+            document.getElementById('passwordModal').classList.add('active');
+            document.getElementById('passwordInput').focus();
+        }
+
+        function closePasswordModal() {
+            document.getElementById('passwordModal').classList.remove('active');
+            pendingAction = null;
+            currentPasswordLevel = null;
+        }
+
+        function handlePasswordEnter(event) {
+            if (event.key === 'Enter') {
+                verifyPassword();
+            }
+        }
+
+        function verifyPassword() {
+            const enteredPassword = document.getElementById('passwordInput').value;
+            const errorDiv = document.getElementById('passwordError');
+
+            if (!auth || !currentUser || !currentUser.email) {
+                if (errorDiv) errorDiv.style.display = 'block';
+                return;
+            }
+
+            const credential = firebase.auth.EmailAuthProvider.credential(currentUser.email, enteredPassword);
+
+            auth.currentUser.reauthenticateWithCredential(credential)
+                .then(() => {
+                    const actionToRun = pendingAction;
+                    closePasswordModal();
+                    if (actionToRun) {
+                        actionToRun();
+                    }
+                })
+                .catch((error) => {
+                    console.error('Re-authentication failed:', error);
+                    if (errorDiv) errorDiv.style.display = 'block';
+                });
+        }
+
+        // Package Management Functions
+        function showAddPackageForm() {
+            document.getElementById('addPackageForm').style.display = 'block';
+        }
+
+        function hideAddPackageForm() {
+            document.getElementById('addPackageForm').style.display = 'none';
+            document.getElementById('newPackageName').value = '';
+            document.getElementById('newPackageArea').value = '';
+            document.getElementById('newPackageSessions').value = '';
+            document.getElementById('newPackagePrice').value = '';
+        }
+
+        function addNewPackage(event) {
+            event.preventDefault();
+            
+            const newPackage = {
+                name: document.getElementById('newPackageName').value,
+                area: document.getElementById('newPackageArea').value,
+                sessions: parseInt(document.getElementById('newPackageSessions').value),
+                price: parseFloat(document.getElementById('newPackagePrice').value)
+            };
+
+            packages.push(newPackage);
+            savePackagesToStorage();
+            
+            hideAddPackageForm();
+            displayPackages();
+            populatePackageDropdown();
+            
+            alert('Package added successfully!');
+        }
+
+        function requestEditPackage(index) {
+            requirePermission('managePackages', () => {
+                showPasswordModal(
+                    'Please re-enter your password to edit this package:',
+                    () => editPackage(index)
+                );
+            });
+        }
+
+        function editPackage(index) {
+            const pkg = packages[index];
+            document.getElementById('editPackageName').value = pkg.name;
+            document.getElementById('editPackageArea').value = pkg.area;
+            document.getElementById('editPackageSessions').value = pkg.sessions;
+            document.getElementById('editPackagePrice').value = pkg.price;
+            document.getElementById('editPackageIndex').value = index;
+            document.getElementById('editPackageModal').classList.add('active');
+        }
+
+        function closeEditPackageModal() {
+            document.getElementById('editPackageModal').classList.remove('active');
+        }
+
+        function savePackageEdit(event) {
+            event.preventDefault();
+            
+            const index = parseInt(document.getElementById('editPackageIndex').value);
+            packages[index] = {
+                name: document.getElementById('editPackageName').value,
+                area: document.getElementById('editPackageArea').value,
+                sessions: parseInt(document.getElementById('editPackageSessions').value),
+                price: parseFloat(document.getElementById('editPackagePrice').value)
+            };
+
+            savePackagesToStorage();
+            closeEditPackageModal();
+            displayPackages();
+            populatePackageDropdown();
+            
+            alert('Package updated successfully!');
+        }
+
+        function requestDeletePackage(index) {
+            requirePermission('deletePackages', () => {
+                showPasswordModal(
+                    'Please re-enter your password to delete this package:',
+                    () => deletePackage(index)
+                );
+            });
+        }
+
+        function deletePackage(index) {
+            if (confirm(`Are you sure you want to delete the package "${packages[index].name}"?`)) {
+                packages.splice(index, 1);
+                savePackagesToStorage();
+                displayPackages();
+                populatePackageDropdown();
+                alert('Package deleted successfully!');
+            }
+        }
+
+        function exportToExcel() {
+            if (!currentUser || !hasPermission('exportData')) {
+                alert('You do not have permission to export data.');
+                return;
+            }
+
+            // Create CSV content (include installment info as well)
+            let csv = 'File Number,Emirates ID,Patient Name,Phone,Package,Total Sessions,Completed,Remaining,Package Price,Amount Paid,Remaining Balance,Payment Status,Installment Method,Extra Sessions,Extra Cost,Registration Date,Package Start Date,Package End Date,Last Visit,Status,Notes\n';
+            
+            patients.forEach(p => {
+                const remaining = p.totalSessions - p.sessionsCompleted;
+                const packagePrice = p.packagePrice || p.amountPaid;
+                const remainingBalance = p.remainingBalance || 0;
+                const paymentStatus = p.paymentStatus || 'Paid in Full';
+                const installmentMethod = p.installmentMethod || (p.paymentStatus === 'Installment' ? 'Cash' : '');
+                
+                csv += `"${p.fileNumber}","${p.emiratesId}","${p.name}","${p.phone}","${p.package}",${p.totalSessions},${p.sessionsCompleted},${remaining},${packagePrice},${p.amountPaid},${remainingBalance},"${paymentStatus}","${installmentMethod}",${p.extraSessions},${p.extraSessionCost},"${p.registrationDate}","${p.packageStartDate || ''}","${p.packageEndDate || ''}","${p.lastVisit}","${p.status}","${p.notes || ''}"\n`;
+            });
+
+            // Create download
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Noubel_Patients_${new Date().toISOString().split('T')[0]}.csv`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+        }
+
+        // Close modal when clicking outside
+        function printPaymentInvoiceForHistory(patientIndex, paymentIndex) {
+            const p = patients[patientIndex];
+            const payment = p && p.paymentHistory && p.paymentHistory[paymentIndex];
+            if (p && payment) {
+                printPaymentInvoice(p, payment.amount, payment.type, payment.date, '');
+            }
+        }
+
+        window.onclick = function(event) {
+            if (event.target.classList && event.target.classList.contains('modal')) {
+                if (event.target.id === 'patientModal') closeModal();
+                if (event.target.id === 'passwordModal') closePasswordModal();
+                if (event.target.id === 'editPackageModal') closeEditPackageModal();
+                if (event.target.id === 'editPatientModal') closeEditPatientModal();
+                if (event.target.id === 'paymentSuccessModal') closePaymentSuccessModal();
+            }
+        }
+    </script>
+</body>
+</html>
