@@ -863,7 +863,7 @@
         <div class="header-content">
             <div class="header-logo">
                 <!-- Update the src path if you place the logo elsewhere in your project -->
-                <img src="Noubel logo.jpeg" alt="Noubel Rehabilitation Center logo">
+                <img src="assets/Noubel logo.jpeg" alt="Noubel Rehabilitation Center logo">
             </div>
             <div>
                 <h1>Noubel Medical Centre</h1>
@@ -2713,21 +2713,21 @@
 
             // Validate Emirates ID format (3-4-7-1)
             if (!emiratesId || emiratesId.length !== 18) {
-                alert('❌ Invalid Emirates ID format. Please enter all 15 digits (XXX-XXXX-XXXXXXX-X).');
+                showToast('Invalid Emirates ID format. Please enter all 15 digits (XXX-XXXX-XXXXXXX-X).', 'error', 5000);
                 return;
             }
 
             // Check for duplicate Emirates ID
             const duplicateEID = patients.find(p => p.emiratesId === emiratesId);
             if (duplicateEID) {
-                alert(`❌ A patient with this Emirates ID already exists!\n\nName: ${duplicateEID.name}\nFile Number: ${duplicateEID.fileNumber}\n\nPlease check the Emirates ID or search for the existing patient.`);
+                showToast(`A patient with this Emirates ID already exists: ${duplicateEID.name} (${duplicateEID.fileNumber})`, 'error', 6000);
                 return;
             }
 
             // Check for duplicate File Number
             const duplicateFile = patients.find(p => p.fileNumber === fileNumber);
             if (duplicateFile) {
-                alert(`❌ A patient with File Number "${fileNumber}" already exists!\n\nName: ${duplicateFile.name}\nEmirates ID: ${duplicateFile.emiratesId}\n\nPlease use a different file number.`);
+                showToast(`File Number "${fileNumber}" already exists for patient: ${duplicateFile.name}`, 'error', 6000);
                 return;
             }
 
@@ -2752,7 +2752,7 @@
                 paymentStatus = 'Paid in Full';
             } else {
                 if (!selectedInstallmentMethod) {
-                    alert('Please select an installment method (Tabby, Tamara, or Cash).');
+                    showToast('Please select an installment method (Tabby, Tamara, or Cash).', 'warning');
                     return;
                 }
                 amountPaid = parseFloat(document.getElementById('initialPayment').value) || 0;
@@ -2814,34 +2814,34 @@
                     : 'Full Payment (Cash)';
                 showPaymentSuccessModal(patient, amountPaid, paymentTypeLabel, patient.registrationDate, patient.package);
             } else {
-                alert('Patient added successfully!');
+                showToast('✅ Patient added successfully!', 'success');
             }
         }
 
         function recordVisit(event) {
             event.preventDefault();
-            
+
             const patientIndex = document.getElementById('visitPatient').value;
             if (!patientIndex) {
-                alert('Please select a patient');
+                showToast('Please select a patient', 'warning');
                 return;
             }
 
             const patient = patients[patientIndex];
-            
+
             // Check if patient has completed all sessions
             if (patient.sessionsCompleted >= patient.totalSessions) {
-                alert('This patient has completed all scheduled sessions. Please use the "Extra Sessions" tab to add additional sessions.');
+                showToast('This patient has completed all scheduled sessions. Please use the "Extra Sessions" tab.', 'warning', 5000);
                 return;
             }
 
             const sessionNumber = patient.sessionsCompleted + 1;
-            
+
             // Handle installment payment if applicable
             const installmentPayment = parseFloat(document.getElementById('installmentPayment').value) || 0;
             if (installmentPayment > 0) {
                 if (installmentPayment > patient.remainingBalance) {
-                    alert(`Payment amount (${installmentPayment} AED) exceeds remaining balance (${patient.remainingBalance.toFixed(2)} AED)`);
+                    showToast(`Payment amount (${installmentPayment} AED) exceeds remaining balance (${patient.remainingBalance.toFixed(2)} AED)`, 'error', 5000);
                     return;
                 }
                 
@@ -3215,21 +3215,30 @@ ${description ? '<div class="row"><span>Description:</span><span>' + description
 
         function savePatientEdit(event) {
             event.preventDefault();
-            
+
             const index = parseInt(document.getElementById('editPatientIndex').value);
             const patient = patients[index];
-            
+            const oldData = {
+                name: patient.name,
+                fileNumber: patient.fileNumber
+            };
+
             patient.emiratesId = getEmiratesIdFromParts('editEmiratesId');
-            patient.fileNumber = document.getElementById('editFileNumber').value;
-            patient.name = document.getElementById('editPatientName').value;
-            patient.phone = document.getElementById('editPhoneNumber').value;
+            patient.fileNumber = document.getElementById('editFileNumber').value.trim();
+            patient.name = document.getElementById('editPatientName').value.trim();
+            patient.phone = document.getElementById('editPhoneNumber').value.trim();
             patient.notes = document.getElementById('editNotes').value;
 
             saveData();
             closeEditPatientModal();
             renderPatients();
-            
-            alert('Patient details updated successfully!');
+
+            showToast('✅ Patient details updated successfully!', 'success');
+            logAudit('PATIENT_UPDATED', {
+                patientName: patient.name,
+                fileNumber: patient.fileNumber,
+                previousName: oldData.name
+            });
         }
 
         function requestDeletePatient(index) {
@@ -3534,22 +3543,35 @@ ${description ? '<div class="row"><span>Description:</span><span>' + description
 
         function addNewPackage(event) {
             event.preventDefault();
-            
+
+            // Permission check
+            if (!currentUser || !hasPermission('managePackages')) {
+                showToast('You do not have permission to manage packages.', 'error');
+                return;
+            }
+
             const newPackage = {
-                name: document.getElementById('newPackageName').value,
-                area: document.getElementById('newPackageArea').value,
+                name: document.getElementById('newPackageName').value.trim(),
+                area: document.getElementById('newPackageArea').value.trim(),
                 sessions: parseInt(document.getElementById('newPackageSessions').value),
                 price: parseFloat(document.getElementById('newPackagePrice').value)
             };
 
+            // Validation
+            if (!newPackage.name || !newPackage.area || !newPackage.sessions || !newPackage.price) {
+                showToast('Please fill in all package fields.', 'error');
+                return;
+            }
+
             packages.push(newPackage);
             savePackagesToStorage();
-            
+
             hideAddPackageForm();
             displayPackages();
             populatePackageDropdown();
-            
-            alert('Package added successfully!');
+
+            showToast('✅ Package added successfully!', 'success');
+            logAudit('PACKAGE_CREATED', { packageName: newPackage.name });
         }
 
         function requestEditPackage(index) {
@@ -3577,11 +3599,13 @@ ${description ? '<div class="row"><span>Description:</span><span>' + description
 
         function savePackageEdit(event) {
             event.preventDefault();
-            
+
             const index = parseInt(document.getElementById('editPackageIndex').value);
+            const oldPackage = packages[index];
+
             packages[index] = {
-                name: document.getElementById('editPackageName').value,
-                area: document.getElementById('editPackageArea').value,
+                name: document.getElementById('editPackageName').value.trim(),
+                area: document.getElementById('editPackageArea').value.trim(),
                 sessions: parseInt(document.getElementById('editPackageSessions').value),
                 price: parseFloat(document.getElementById('editPackagePrice').value)
             };
@@ -3590,8 +3614,12 @@ ${description ? '<div class="row"><span>Description:</span><span>' + description
             closeEditPackageModal();
             displayPackages();
             populatePackageDropdown();
-            
-            alert('Package updated successfully!');
+
+            showToast('✅ Package updated successfully!', 'success');
+            logAudit('PACKAGE_UPDATED', {
+                packageName: packages[index].name,
+                from: oldPackage.name
+            });
         }
 
         function requestDeletePackage(index) {
@@ -3604,12 +3632,16 @@ ${description ? '<div class="row"><span>Description:</span><span>' + description
         }
 
         function deletePackage(index) {
-            if (confirm(`Are you sure you want to delete the package "${packages[index].name}"?`)) {
+            const packageName = packages[index].name;
+
+            if (confirm(`Are you sure you want to delete the package "${packageName}"?\n\nThis action cannot be undone.`)) {
                 packages.splice(index, 1);
                 savePackagesToStorage();
                 displayPackages();
                 populatePackageDropdown();
-                alert('Package deleted successfully!');
+
+                showToast('✅ Package deleted successfully!', 'success');
+                logAudit('PACKAGE_DELETED', { packageName });
             }
         }
 
