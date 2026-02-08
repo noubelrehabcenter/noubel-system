@@ -1595,6 +1595,23 @@
         </div>
     </div>
 
+    <!-- Confirmation Modal -->
+    <div id="confirmModal" class="modal">
+        <div class="modal-content" style="max-width: 550px;">
+            <div class="modal-header">
+                <h2 class="card-title" id="confirmTitle">⚠️ Confirm Action</h2>
+                <button class="close-modal" onclick="closeConfirmModal()">&times;</button>
+            </div>
+            <div style="padding: 20px;">
+                <div id="confirmMessage" style="margin-bottom: 25px; font-size: 1rem; line-height: 1.6; white-space: pre-wrap;"></div>
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button class="btn btn-secondary" onclick="closeConfirmModal()">Cancel</button>
+                    <button class="btn btn-danger" id="confirmButton" onclick="handleConfirm()">Confirm</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Edit Package Modal -->
     <div id="editPackageModal" class="modal">
         <div class="modal-content" style="max-width: 600px;">
@@ -1914,7 +1931,7 @@
                     inactiveMinutes: Math.floor(inactiveTime / 60000)
                 });
                 
-                alert('⏰ Your session has expired due to 30 minutes of inactivity. Please log in again for security.');
+                showToast('⏰ Your session has expired due to 30 minutes of inactivity. Please log in again for security.', 'warning', 8000);
                 
                 if (auth) {
                     auth.signOut();
@@ -2149,11 +2166,11 @@
 
         function requirePermission(permission, action) {
             if (!currentUser) {
-                alert('You must be signed in to perform this action.');
+                showToast('You must be signed in to perform this action.', 'error', 5000);
                 return;
             }
             if (!hasPermission(permission)) {
-                alert('You do not have permission to perform this action.');
+                showToast('You do not have permission to perform this action.', 'error', 5000);
                 return;
             }
             if (typeof action === 'function') {
@@ -2371,10 +2388,10 @@
             if (title) title.textContent = 'Add New User';
         }
 
-        function saveUser(event) {
+        async function saveUser(event) {
             event.preventDefault();
             if (!currentUser || !hasPermission('manageUsers')) {
-                alert('You do not have permission to manage users.');
+                showToast('You do not have permission to manage users.', 'error', 5000);
                 return;
             }
 
@@ -2386,12 +2403,17 @@
             const editingIndex = editingIndexValue === '' ? null : parseInt(editingIndexValue, 10);
 
             if (!email || !password || !role || !accessLevel) {
-                alert('Please fill in all required fields.');
+                showToast('Please fill in all required fields.', 'warning', 5000);
                 return;
             }
 
             if (role === 'owner' && !email.toLowerCase().startsWith('owner')) {
-                const confirmOwner = confirm('You are creating another owner account. Owner accounts have full access to everything. Continue?');
+                const confirmOwner = await showConfirm(
+                    'You are creating another owner account.\n\nOwner accounts have full access to everything including:\n• All patient data\n• Financial information\n• User management\n• System settings\n\nContinue?',
+                    '⚠️ Create Owner Account',
+                    'Yes, Create Owner',
+                    'btn-warning'
+                );
                 if (!confirmOwner) return;
             }
 
@@ -2407,7 +2429,7 @@
             };
 
             if (!auth) {
-                alert('Authentication is not configured. Please check Firebase setup.');
+                showToast('Authentication is not configured. Please check Firebase setup.', 'error', 6000);
                 return;
             }
 
@@ -2472,7 +2494,7 @@
                 if (isChangingFromOwner) {
                     const otherOwners = users.filter((u, idx) => u && u.role === 'owner' && idx !== editingIndex);
                     if (otherOwners.length === 0) {
-                        alert('You cannot remove the only owner account. Create another owner first.');
+                        showToast('You cannot remove the only owner account. Create another owner first.', 'error', 6000);
                         return;
                     }
                 }
@@ -2488,7 +2510,7 @@
                 persistUsers();
                 renderUsersTable();
                 resetUserForm();
-                alert('User updated successfully (role/permissions). To change passwords, use Firebase Authentication console.');
+                showToast('✅ User updated successfully! To change passwords, use Firebase Authentication console.', 'success', 6000);
             }
         }
 
@@ -2516,7 +2538,7 @@
             if (title) title.textContent = 'Edit User';
         }
 
-        function deleteUserAtIndex(index) {
+        async function deleteUserAtIndex(index) {
             if (!currentUser || !hasPermission('manageUsers')) {
                 showToast('You do not have permission to manage users.', 'error');
                 return;
@@ -2530,7 +2552,14 @@
                 return;
             }
 
-            if (!confirm(`⚠️ DELETE USER: "${user.email}"\n\nThis will:\n✓ Remove user from database (immediate)\n✓ Block their access to the system (immediate)\n\n⚠️ IMPORTANT: You must also manually delete/disable their Firebase Authentication account:\n1. Go to Firebase Console\n2. Navigate to Authentication > Users\n3. Find and delete: ${user.email}\n\nContinue with database deletion?`)) {
+            const confirmed = await showConfirm(
+                `DELETE USER: "${user.email}"\n\nThis will:\n✓ Remove user from database (immediate)\n✓ Block their access to the system (immediate)\n\n⚠️ IMPORTANT: You must also manually delete/disable their Firebase Authentication account:\n\n1. Go to Firebase Console\n2. Navigate to Authentication → Users\n3. Find and delete: ${user.email}\n\nContinue with database deletion?`,
+                '🗑️ Delete User',
+                'Yes, Delete User',
+                'btn-danger'
+            );
+
+            if (!confirmed) {
                 return;
             }
 
@@ -2796,7 +2825,7 @@
                     console.log("✅ Patients synced to cloud");
                 }).catch((error) => {
                     console.error("❌ Error syncing patients:", error);
-                    alert("Failed to sync to cloud. Check your internet connection.");
+                    showToast("⚠️ Failed to sync to cloud. Check your internet connection.", 'error', 6000);
                 });
                 
                 database.ref('visits').set(visits).then(() => {
@@ -3020,7 +3049,7 @@
             sessionDisplay.value = `Extra Session #${extraNumber}`;
         }
 
-        function addPatient(event) {
+        async function addPatient(event) {
             event.preventDefault();
 
             // === DUPLICATE DETECTION ===
@@ -3069,7 +3098,12 @@
             // Check for duplicate Phone Number (warning only)
             const duplicatePhone = patients.find(p => p.phone === phone);
             if (duplicatePhone) {
-                const confirmed = confirm(`⚠️ Warning: This phone number is already registered to:\n\nName: ${duplicatePhone.name}\nFile Number: ${duplicatePhone.fileNumber}\n\nDo you want to continue adding this patient?`);
+                const confirmed = await showConfirm(
+                    `Warning: This phone number is already registered to:\n\nName: ${duplicatePhone.name}\nFile Number: ${duplicatePhone.fileNumber}\n\nDo you want to continue adding this patient anyway?`,
+                    '⚠️ Duplicate Phone Number',
+                    'Yes, Continue',
+                    'btn-warning'
+                );
                 if (!confirmed) {
                     return;
                 }
@@ -3241,7 +3275,7 @@
                 const methodLabel = patient.installmentMethod || 'Cash';
                 showPaymentSuccessModal(patient, installmentPayment, `Installment Payment - ${methodLabel}`, visit.date, `Session ${sessionNumber} of ${patient.totalSessions}`);
             } else {
-                alert(`Visit recorded successfully! Session ${sessionNumber} of ${patient.totalSessions}`);
+                showToast(`✅ Visit recorded successfully! Session ${sessionNumber} of ${patient.totalSessions}`, 'success', 5000);
             }
         }
 
@@ -3250,7 +3284,7 @@
             
             const patientIndex = document.getElementById('extraPatient').value;
             if (!patientIndex) {
-                alert('Please select a patient');
+                showToast('Please select a patient', 'warning', 4000);
                 return;
             }
 
@@ -3770,8 +3804,18 @@ ${description ? '<div class="row"><span>Description:</span><span>' + description
             document.getElementById('patientModal').classList.remove('active');
         }
 
-        function deletePatient(index) {
-            if (confirm('Are you sure you want to delete this patient record?')) {
+        async function deletePatient(index) {
+            const patient = patients[index];
+            if (!patient) return;
+
+            const confirmed = await showConfirm(
+                `Are you sure you want to delete this patient record?\n\nPatient: ${patient.name}\nFile Number: ${patient.fileNumber}\nEmirates ID: ${patient.emiratesId}\n\n⚠️ This action cannot be undone!\nAll visit history for this patient will also be deleted.`,
+                '🗑️ Delete Patient Record',
+                'Yes, Delete Patient',
+                'btn-danger'
+            );
+
+            if (confirmed) {
                 const deletedPatient = patients[index];
                 
                 // Log audit event before deletion
@@ -3860,6 +3904,56 @@ ${description ? '<div class="row"><span>Description:</span><span>' + description
             document.getElementById('passwordModal').classList.remove('active');
             pendingAction = null;
             currentPasswordLevel = null;
+        }
+
+        // ==================== CONFIRMATION MODAL FUNCTIONS ====================
+        let pendingConfirmAction = null;
+
+        /**
+         * Show custom confirmation modal instead of browser confirm()
+         * @param {string} message - The confirmation message
+         * @param {string} title - Optional custom title (default: "⚠️ Confirm Action")
+         * @param {string} confirmButtonText - Optional button text (default: "Confirm")
+         * @param {string} confirmButtonClass - Optional button class (default: "btn-danger")
+         * @returns {Promise<boolean>} - Resolves to true if confirmed, false if cancelled
+         */
+        function showConfirm(message, title = "⚠️ Confirm Action", confirmButtonText = "Confirm", confirmButtonClass = "btn-danger") {
+            return new Promise((resolve) => {
+                const modal = document.getElementById('confirmModal');
+                const titleEl = document.getElementById('confirmTitle');
+                const messageEl = document.getElementById('confirmMessage');
+                const confirmBtn = document.getElementById('confirmButton');
+
+                titleEl.textContent = title;
+                messageEl.textContent = message;
+                confirmBtn.textContent = confirmButtonText;
+
+                // Remove all button classes and add new one
+                confirmBtn.className = 'btn ' + confirmButtonClass;
+
+                pendingConfirmAction = resolve;
+                modal.classList.add('active');
+            });
+        }
+
+        function handleConfirm() {
+            const modal = document.getElementById('confirmModal');
+            modal.classList.remove('active');
+
+            if (pendingConfirmAction) {
+                pendingConfirmAction(true);
+                pendingConfirmAction = null;
+            }
+        }
+
+        function closeConfirmModal() {
+            const modal = document.getElementById('confirmModal');
+            modal.classList.remove('active');
+
+            if (pendingConfirmAction) {
+                pendingConfirmAction(false);
+                pendingConfirmAction = null;
+            }
         }
 
         function handlePasswordEnter(event) {
@@ -3996,10 +4090,18 @@ ${description ? '<div class="row"><span>Description:</span><span>' + description
             });
         }
 
-        function deletePackage(index) {
-            const packageName = packages[index].name;
+        async function deletePackage(index) {
+            const pkg = packages[index];
+            if (!pkg) return;
 
-            if (confirm(`Are you sure you want to delete the package "${packageName}"?\n\nThis action cannot be undone.`)) {
+            const confirmed = await showConfirm(
+                `Are you sure you want to delete this package?\n\nPackage: ${pkg.name}\nArea: ${pkg.area}\nSessions: ${pkg.sessions}\nPrice: ${pkg.price} AED\n\n⚠️ This action cannot be undone!`,
+                '🗑️ Delete Package',
+                'Yes, Delete Package',
+                'btn-danger'
+            );
+
+            if (confirmed) {
                 packages.splice(index, 1);
                 savePackagesToStorage();
                 displayPackages();
@@ -4012,7 +4114,7 @@ ${description ? '<div class="row"><span>Description:</span><span>' + description
 
         function exportToExcel() {
             if (!currentUser || !hasPermission('exportData')) {
-                alert('You do not have permission to export data.');
+                showToast('You do not have permission to export data.', 'error', 5000);
                 return;
             }
 
