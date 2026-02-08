@@ -3,6 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.googleapis.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://*.firebaseio.com https://*.googleapis.com https://*.firebasedatabase.app wss://*.firebaseio.com; img-src 'self' data: https:;">
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    <meta http-equiv="X-Frame-Options" content="DENY">
+    <meta http-equiv="X-XSS-Protection" content="1; mode=block">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
     <title>Noubel Medical Centre - Cloud System</title>
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
     
@@ -929,6 +934,7 @@
             <button class="tab-btn" data-tab="history" onclick="switchTab('history', this)">📋 Visit History</button>
             <button class="tab-btn" data-tab="packages" onclick="switchTab('packages', this)">📦 Packages</button>
             <button class="tab-btn" id="securityTabBtn" data-tab="security" onclick="switchTab('security', this)">👤 Users &amp; Access</button>
+            <button class="tab-btn" id="activityLogTabBtn" data-tab="activity-log" onclick="switchTab('activity-log', this)">📜 Activity Log</button>
         </div>
 
         <!-- Dashboard Tab -->
@@ -954,7 +960,7 @@
                     <div class="stat-label">Sessions Completed</div>
                     <div class="stat-value" id="sessionsCompleted">0</div>
                 </div>
-                <div class="stat-card">
+                <div class="stat-card" data-permission="viewPayments">
                     <div class="stat-label">Pending Balance</div>
                     <div class="stat-value" id="pendingBalance">0 AED</div>
                 </div>
@@ -1154,6 +1160,89 @@
                             <button type="button" class="btn btn-secondary" onclick="resetUserForm()">Reset</button>
                         </div>
                     </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Activity Log Tab -->
+        <div id="activity-log" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">📜 Activity Log</h2>
+                    <button class="btn btn-success btn-small" onclick="exportActivityLog()">📥 Export Log</button>
+                </div>
+
+                <p style="margin-bottom: 15px; color: var(--text-light);">
+                    Complete audit trail of all system activities. Only visible to <strong>owners</strong> and <strong>managers</strong>.
+                </p>
+
+                <!-- Filters -->
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                    <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
+                        <div class="form-group">
+                            <label for="activityLogSearch">🔍 Search</label>
+                            <input type="text" id="activityLogSearch" placeholder="Search by user, action, or details..." oninput="filterActivityLog()">
+                        </div>
+                        <div class="form-group">
+                            <label for="activityActionFilter">Filter by Action</label>
+                            <select id="activityActionFilter" onchange="filterActivityLog()">
+                                <option value="">All Actions</option>
+                                <option value="PATIENT_">Patient Operations</option>
+                                <option value="USER_">User Operations</option>
+                                <option value="PACKAGE_">Package Operations</option>
+                                <option value="VISIT_">Visit Operations</option>
+                                <option value="DATA_">Data Operations</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="activityUserFilter">Filter by User</label>
+                            <select id="activityUserFilter" onchange="filterActivityLog()">
+                                <option value="">All Users</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="activityDateRange">Date Range</label>
+                            <select id="activityDateRange" onchange="filterActivityLog()">
+                                <option value="all">All Time</option>
+                                <option value="today">Today</option>
+                                <option value="week">Last 7 Days</option>
+                                <option value="month">Last 30 Days</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div style="margin-top: 10px;">
+                        <button class="btn btn-secondary btn-small" onclick="resetActivityLogFilters()">Clear Filters</button>
+                        <button class="btn btn-primary btn-small" onclick="refreshActivityLog()">🔄 Refresh</button>
+                    </div>
+                </div>
+
+                <!-- Activity Log Table -->
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>User</th>
+                                <th>Role</th>
+                                <th>Action</th>
+                                <th>Details</th>
+                                <th>IP / Device</th>
+                            </tr>
+                        </thead>
+                        <tbody id="activityLogTableBody">
+                            <tr>
+                                <td colspan="6" style="text-align: center; padding: 20px; color: var(--text-light);">
+                                    Loading activity log...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Pagination -->
+                <div id="activityLogPagination" style="margin-top: 20px; display: flex; justify-content: space-between; align-items: center;">
+                    <div id="activityLogInfo" style="color: var(--text-light);"></div>
+                    <div id="activityLogPageControls"></div>
                 </div>
             </div>
         </div>
@@ -1608,6 +1697,101 @@
     </div>
 
     <script>
+        // ==================== SECURITY & SANITIZATION ====================
+
+        /**
+         * Sanitizes HTML to prevent XSS attacks
+         * Escapes dangerous characters that could execute scripts
+         * @param {string} str - The string to sanitize
+         * @returns {string} - Sanitized string safe for innerHTML
+         */
+        function sanitizeHTML(str) {
+            if (str === null || str === undefined) return '';
+            const temp = document.createElement('div');
+            temp.textContent = str;
+            return temp.innerHTML;
+        }
+
+        /**
+         * Sanitizes an object's properties for safe HTML display
+         * @param {object} obj - Object to sanitize
+         * @param {array} keys - Keys to sanitize
+         * @returns {object} - New object with sanitized values
+         */
+        function sanitizeObject(obj, keys) {
+            const sanitized = { ...obj };
+            keys.forEach(key => {
+                if (sanitized[key]) {
+                    sanitized[key] = sanitizeHTML(sanitized[key]);
+                }
+            });
+            return sanitized;
+        }
+
+        /**
+         * Validates Emirates ID format
+         * @param {string} eid - Emirates ID to validate
+         * @returns {boolean} - True if valid format
+         */
+        function validateEmiratesID(eid) {
+            // Must be exactly 18 characters (XXX-XXXX-XXXXXXX-X format)
+            if (!eid || eid.length !== 18) return false;
+            // Remove dashes and check if all digits
+            const digitsOnly = eid.replace(/-/g, '');
+            return digitsOnly.length === 15 && /^\d+$/.test(digitsOnly);
+        }
+
+        /**
+         * Validates phone number format
+         * @param {string} phone - Phone number to validate
+         * @returns {boolean} - True if valid format
+         */
+        function validatePhone(phone) {
+            if (!phone) return false;
+            // Remove all non-digits
+            const digitsOnly = phone.replace(/\D/g, '');
+            // Should have 7-15 digits
+            return digitsOnly.length >= 7 && digitsOnly.length <= 15;
+        }
+
+        /**
+         * Rate limiting for login attempts
+         */
+        const loginAttempts = {
+            count: 0,
+            lastAttempt: null,
+            maxAttempts: 5,
+            lockoutDuration: 5 * 60 * 1000, // 5 minutes
+
+            canAttemptLogin() {
+                const now = Date.now();
+
+                // Reset if lockout period has passed
+                if (this.lastAttempt && (now - this.lastAttempt) > this.lockoutDuration) {
+                    this.count = 0;
+                }
+
+                return this.count < this.maxAttempts;
+            },
+
+            recordAttempt(success) {
+                this.lastAttempt = Date.now();
+
+                if (success) {
+                    this.count = 0; // Reset on successful login
+                } else {
+                    this.count++;
+                }
+            },
+
+            getRemainingLockoutTime() {
+                if (!this.lastAttempt) return 0;
+                const elapsed = Date.now() - this.lastAttempt;
+                const remaining = this.lockoutDuration - elapsed;
+                return Math.max(0, Math.ceil(remaining / 1000 / 60)); // Minutes
+            }
+        };
+
         // ==================== FIREBASE CONFIGURATION ====================
         // REPLACE THIS WITH YOUR FIREBASE CONFIG
         const firebaseConfig = {
@@ -2019,10 +2203,15 @@
 
         function applyUserPermissions() {
             const revenueCard = document.querySelector('[data-permission="viewRevenue"]');
+            const pendingBalanceCard = document.querySelector('[data-permission="viewPayments"]');
             const securityTabBtn = document.getElementById('securityTabBtn');
 
             if (revenueCard) {
                 revenueCard.style.display = hasPermission('viewRevenue') ? '' : 'none';
+            }
+
+            if (pendingBalanceCard) {
+                pendingBalanceCard.style.display = hasPermission('viewPayments') ? '' : 'none';
             }
 
             // Hide export buttons for users without exportData permission
@@ -2031,13 +2220,26 @@
             });
 
             // Show Users & Access tab ONLY for owners and managers
+            const activityLogTabBtn = document.getElementById('activityLogTabBtn');
+            const canAccessAdminFeatures = currentUser && (currentUser.role === 'owner' || currentUser.role === 'manager');
+
             if (securityTabBtn) {
-                const canAccessUserManagement = currentUser && (currentUser.role === 'owner' || currentUser.role === 'manager');
-                securityTabBtn.style.display = canAccessUserManagement ? '' : 'none';
+                securityTabBtn.style.display = canAccessAdminFeatures ? '' : 'none';
 
                 // If user is on security tab and doesn't have access, switch to dashboard
                 const securityTab = document.getElementById('security');
-                if (!canAccessUserManagement && securityTab && securityTab.classList.contains('active')) {
+                if (!canAccessAdminFeatures && securityTab && securityTab.classList.contains('active')) {
+                    switchTab('dashboard');
+                }
+            }
+
+            // Show Activity Log tab ONLY for owners and managers
+            if (activityLogTabBtn) {
+                activityLogTabBtn.style.display = canAccessAdminFeatures ? '' : 'none';
+
+                // If user is on activity log tab and doesn't have access, switch to dashboard
+                const activityLogTab = document.getElementById('activity-log');
+                if (!canAccessAdminFeatures && activityLogTab && activityLogTab.classList.contains('active')) {
                     switchTab('dashboard');
                 }
             }
@@ -2051,20 +2253,58 @@
             const password = document.getElementById('loginPassword').value;
             const errorDiv = document.getElementById('loginError');
 
+            // SECURITY: Check rate limiting
+            if (!loginAttempts.canAttemptLogin()) {
+                const remainingMinutes = loginAttempts.getRemainingLockoutTime();
+                if (errorDiv) {
+                    errorDiv.textContent = `🔒 Too many failed login attempts. Please try again in ${remainingMinutes} minute(s).`;
+                    errorDiv.style.display = 'block';
+                }
+                showToast(`Account temporarily locked due to multiple failed attempts. Try again in ${remainingMinutes} minutes.`, 'error', 8000);
+                return;
+            }
+
             if (!auth) {
-                alert('Authentication is not configured. Please check Firebase setup.');
+                showToast('Authentication is not configured. Please check Firebase setup.', 'error');
+                return;
+            }
+
+            // SECURITY: Validate email format before attempting login
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) {
+                if (errorDiv) {
+                    errorDiv.textContent = 'Please enter a valid email address.';
+                    errorDiv.style.display = 'block';
+                }
                 return;
             }
 
             auth.signInWithEmailAndPassword(email, password)
                 .then(() => {
                     if (errorDiv) errorDiv.style.display = 'none';
+                    loginAttempts.recordAttempt(true); // Reset on success
+                    showToast('✅ Login successful!', 'success', 2000);
                     // onAuthStateChanged handler will take care of setting currentUser and UI
                 })
                 .catch((error) => {
                     console.error('Login error:', error);
-                    if (errorDiv) errorDiv.textContent = 'Invalid email or password.'; 
-                    if (errorDiv) errorDiv.style.display = 'block';
+                    loginAttempts.recordAttempt(false); // Increment failure count
+
+                    let errorMessage = 'Invalid email or password.';
+                    if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+                        errorMessage = 'Invalid email or password.';
+                    } else if (error.code === 'auth/too-many-requests') {
+                        errorMessage = 'Too many failed attempts. Please try again later.';
+                    } else if (error.code === 'auth/user-disabled') {
+                        errorMessage = 'This account has been disabled.';
+                    }
+
+                    if (errorDiv) {
+                        errorDiv.textContent = errorMessage;
+                        errorDiv.style.display = 'block';
+                    }
+
+                    showToast(`❌ ${errorMessage}`, 'error', 5000);
                 });
         }
 
@@ -2107,15 +2347,16 @@
                 const isOwner = user.role === 'owner';
 
                 const tr = document.createElement('tr');
+                // SECURITY: Sanitize all user data before displaying
                 tr.innerHTML = `
-                    <td>${user.email || '-'}</td>
-                    <td>${user.role || ''}</td>
-                    <td>${user.accessLevel || ''}</td>
-                    <td>${permsText}</td>
+                    <td>${sanitizeHTML(user.email || '-')}</td>
+                    <td>${sanitizeHTML(user.role || '')}</td>
+                    <td>${sanitizeHTML(user.accessLevel || '')}</td>
+                    <td>${sanitizeHTML(permsText)}</td>
                     <td>
                         ${isOwner ? '<span style="font-size: 0.8rem; color: var(--text-light);">Owner</span>' : `
-                        <button class="btn btn-small btn-secondary" type="button" onclick="startEditUser(${index})">Edit</button>
-                        <button class="btn btn-small btn-danger" type="button" onclick="deleteUserAtIndex(${index})">Delete</button>
+                        <button class="btn btn-small btn-secondary" type="button" onclick="startEditUser(${parseInt(index)})">Edit</button>
+                        <button class="btn btn-small btn-danger" type="button" onclick="deleteUserAtIndex(${parseInt(index)})">Delete</button>
                         `}
                     </td>
                 `;
@@ -2594,21 +2835,26 @@
             document.getElementById('extraVisitDate').value = today;
         }
 
-        function switchTab(tabName) {
+        function switchTab(tabName, buttonElement) {
             // Hide all tabs
             document.querySelectorAll('.tab-content').forEach(tab => {
                 tab.classList.remove('active');
             });
-            
+
             // Remove active from all buttons
             document.querySelectorAll('.tab-btn').forEach(btn => {
                 btn.classList.remove('active');
             });
-            
+
             // Show selected tab
             document.getElementById(tabName).classList.add('active');
-            const clickedBtn = typeof arguments[1] !== 'undefined' ? arguments[1] : document.querySelector(`.tab-btn[data-tab="${tabName}"]`);
+            const clickedBtn = typeof buttonElement !== 'undefined' ? buttonElement : document.querySelector(`.tab-btn[data-tab="${tabName}"]`);
             if (clickedBtn) clickedBtn.classList.add('active');
+
+            // Load activity logs when switching to activity log tab
+            if (tabName === 'activity-log' && activityLogs.length === 0) {
+                loadActivityLogs();
+            }
 
             // Update patient dropdowns
             if (tabName === 'visits') {
@@ -2616,6 +2862,17 @@
             }
             if (tabName === 'extra-sessions') {
                 populateExtraPatientDropdown();
+            }
+
+            // Update dashboard when switching to it
+            if (tabName === 'dashboard') {
+                updateDashboard();
+            } else if (tabName === 'patients') {
+                renderPatients();
+            } else if (tabName === 'history') {
+                renderVisits();
+            } else if (tabName === 'packages') {
+                displayPackages();
             }
         }
 
@@ -2773,9 +3030,27 @@
             const fileNumber = document.getElementById('fileNumber').value.trim();
             const phone = document.getElementById('phoneNumber').value.trim();
 
-            // Validate Emirates ID format (3-4-7-1)
-            if (!emiratesId || emiratesId.length !== 18) {
+            // SECURITY: Validate Emirates ID format (3-4-7-1)
+            if (!validateEmiratesID(emiratesId)) {
                 showToast('Invalid Emirates ID format. Please enter all 15 digits (XXX-XXXX-XXXXXXX-X).', 'error', 5000);
+                return;
+            }
+
+            // SECURITY: Validate phone number
+            if (!validatePhone(phone)) {
+                showToast('Invalid phone number. Please enter a valid phone number.', 'error', 5000);
+                return;
+            }
+
+            // SECURITY: Validate patient name (no HTML tags or scripts)
+            const patientName = document.getElementById('patientName').value.trim();
+            if (!patientName || patientName.length < 2 || patientName.length > 100) {
+                showToast('Invalid patient name. Name must be between 2 and 100 characters.', 'error', 5000);
+                return;
+            }
+
+            if (/<|>|script|javascript:/i.test(patientName)) {
+                showToast('Invalid characters in patient name. Please remove any special symbols.', 'error', 5000);
                 return;
             }
 
@@ -3045,19 +3320,20 @@
             patients.slice(-5).reverse().forEach(patient => {
                 const progress = (patient.sessionsCompleted / patient.totalSessions * 100).toFixed(0);
                 const tr = document.createElement('tr');
+                // SECURITY: Sanitize all user-provided data before displaying
                 tr.innerHTML = `
-                    <td>${patient.fileNumber}</td>
-                    <td>${patient.name}</td>
-                    <td>${patient.package}</td>
+                    <td>${sanitizeHTML(patient.fileNumber)}</td>
+                    <td>${sanitizeHTML(patient.name)}</td>
+                    <td>${sanitizeHTML(patient.package)}</td>
                     <td>
                         <div class="progress-container">
                             <div class="progress-bar">
-                                <div class="progress-fill" style="width: ${progress}%"></div>
+                                <div class="progress-fill" style="width: ${parseInt(progress)}%"></div>
                             </div>
-                            <div class="progress-text">${patient.sessionsCompleted}/${patient.totalSessions} sessions</div>
+                            <div class="progress-text">${parseInt(patient.sessionsCompleted)}/${parseInt(patient.totalSessions)} sessions</div>
                         </div>
                     </td>
-                    <td><span class="badge badge-${patient.status.toLowerCase()}">${patient.status}</span></td>
+                    <td><span class="badge badge-${sanitizeHTML(patient.status).toLowerCase()}">${sanitizeHTML(patient.status)}</span></td>
                 `;
                 tbody.appendChild(tr);
             });
@@ -3093,27 +3369,28 @@
                 if (patient.paymentStatus === 'Paid in Full') {
                     paymentBadge = '<span class="badge badge-active" style="margin-left: 5px;">Paid</span>';
                 } else if (patient.remainingBalance > 0) {
-                    paymentBadge = `<span class="badge badge-pending" style="margin-left: 5px;">Balance: ${patient.remainingBalance.toFixed(0)} AED</span>`;
+                    paymentBadge = `<span class="badge badge-pending" style="margin-left: 5px;">Balance: ${parseFloat(patient.remainingBalance).toFixed(0)} AED</span>`;
                 }
 
                 // Format last visit date
                 const lastVisitDate = patient.lastVisit ? new Date(patient.lastVisit).toLocaleDateString('en-GB', {day: '2-digit', month: 'short', year: 'numeric'}) : 'Never';
 
+                // SECURITY: Sanitize all user-provided data before displaying
                 tr.innerHTML = `
-                    <td>${patient.fileNumber}</td>
-                    <td>${patient.emiratesId}</td>
-                    <td>${patient.name}</td>
-                    <td>${patient.phone}</td>
-                    <td>${patient.package}</td>
-                    <td>${patient.sessionsCompleted}/${patient.totalSessions} (${sessionsRemaining} left)</td>
-                    <td>${patient.amountPaid.toLocaleString()} AED${paymentBadge}</td>
-                    <td>${lastVisitDate}</td>
-                    <td><span class="badge badge-${patient.status.toLowerCase()}">${patient.status}</span></td>
+                    <td>${sanitizeHTML(patient.fileNumber)}</td>
+                    <td>${sanitizeHTML(patient.emiratesId)}</td>
+                    <td>${sanitizeHTML(patient.name)}</td>
+                    <td>${sanitizeHTML(patient.phone)}</td>
+                    <td>${sanitizeHTML(patient.package)}</td>
+                    <td>${parseInt(patient.sessionsCompleted)}/${parseInt(patient.totalSessions)} (${sessionsRemaining} left)</td>
+                    <td>${parseFloat(patient.amountPaid).toLocaleString()} AED${paymentBadge}</td>
+                    <td>${sanitizeHTML(lastVisitDate)}</td>
+                    <td><span class="badge badge-${sanitizeHTML(patient.status).toLowerCase()}">${sanitizeHTML(patient.status)}</span></td>
                     <td>
                         <div class="actions">
-                            <button class="action-btn view-btn" onclick="viewPatient(${actualIndex})">View</button>
-                            <button class="action-btn edit-btn" onclick="requestEditPatient(${actualIndex})">Edit</button>
-                            <button class="action-btn delete-btn" onclick="requestDeletePatient(${actualIndex})">Delete</button>
+                            <button class="action-btn view-btn" onclick="viewPatient(${parseInt(actualIndex)})">View</button>
+                            <button class="action-btn edit-btn" onclick="requestEditPatient(${parseInt(actualIndex)})">Edit</button>
+                            <button class="action-btn delete-btn" onclick="requestDeletePatient(${parseInt(actualIndex)})">Delete</button>
                         </div>
                     </td>
                 `;
@@ -3280,26 +3557,51 @@ ${description ? '<div class="row"><span>Description:</span><span>' + description
 
             const index = parseInt(document.getElementById('editPatientIndex').value);
             const patient = patients[index];
+
+            // Capture old data for audit trail
             const oldData = {
                 name: patient.name,
-                fileNumber: patient.fileNumber
+                fileNumber: patient.fileNumber,
+                emiratesId: patient.emiratesId,
+                phone: patient.phone,
+                notes: patient.notes
             };
 
-            patient.emiratesId = getEmiratesIdFromParts('editEmiratesId');
-            patient.fileNumber = document.getElementById('editFileNumber').value.trim();
-            patient.name = document.getElementById('editPatientName').value.trim();
-            patient.phone = document.getElementById('editPhoneNumber').value.trim();
-            patient.notes = document.getElementById('editNotes').value;
+            // Get new data
+            const newData = {
+                emiratesId: getEmiratesIdFromParts('editEmiratesId'),
+                fileNumber: document.getElementById('editFileNumber').value.trim(),
+                name: document.getElementById('editPatientName').value.trim(),
+                phone: document.getElementById('editPhoneNumber').value.trim(),
+                notes: document.getElementById('editNotes').value
+            };
+
+            // Update patient
+            patient.emiratesId = newData.emiratesId;
+            patient.fileNumber = newData.fileNumber;
+            patient.name = newData.name;
+            patient.phone = newData.phone;
+            patient.notes = newData.notes;
 
             saveData();
             closeEditPatientModal();
             renderPatients();
 
+            // Log detailed changes for audit trail
+            const changes = {};
+            if (oldData.name !== newData.name) changes.name = { from: oldData.name, to: newData.name };
+            if (oldData.fileNumber !== newData.fileNumber) changes.fileNumber = { from: oldData.fileNumber, to: newData.fileNumber };
+            if (oldData.emiratesId !== newData.emiratesId) changes.emiratesId = { from: oldData.emiratesId, to: newData.emiratesId };
+            if (oldData.phone !== newData.phone) changes.phone = { from: oldData.phone, to: newData.phone };
+            if (oldData.notes !== newData.notes) changes.notesChanged = true;
+
             showToast('✅ Patient details updated successfully!', 'success');
             logAudit('PATIENT_UPDATED', {
-                patientName: patient.name,
-                fileNumber: patient.fileNumber,
-                previousName: oldData.name
+                patientName: newData.name,
+                fileNumber: newData.fileNumber,
+                patientIndex: index,
+                changes: changes,
+                changeCount: Object.keys(changes).length
             });
         }
 
@@ -3381,10 +3683,10 @@ ${description ? '<div class="row"><span>Description:</span><span>' + description
                             <tbody>
                                 ${patient.paymentHistory.map((p, i) => `
                                     <tr>
-                                        <td>${p.date}</td>
-                                        <td>${p.type}</td>
-                                        <td>${p.amount.toLocaleString()} AED</td>
-                                        <td><button class="btn btn-small btn-secondary" onclick="printPaymentInvoiceForHistory(${patientIdx}, ${i})" style="padding: 4px 10px; font-size: 0.8rem;">🖨️ Print</button></td>
+                                        <td>${sanitizeHTML(p.date)}</td>
+                                        <td>${sanitizeHTML(p.type)}</td>
+                                        <td>${parseFloat(p.amount).toLocaleString()} AED</td>
+                                        <td><button class="btn btn-small btn-secondary" onclick="printPaymentInvoiceForHistory(${parseInt(patientIdx)}, ${parseInt(i)})" style="padding: 4px 10px; font-size: 0.8rem;">🖨️ Print</button></td>
                                     </tr>
                                 `).join('')}
                             </tbody>
@@ -3393,42 +3695,43 @@ ${description ? '<div class="row"><span>Description:</span><span>' + description
                 `;
             }
             
+            // SECURITY: Sanitize all patient data before displaying in modal
             modalBody.innerHTML = `
                 <div class="form-grid">
-                    <div><strong>File Number:</strong> ${patient.fileNumber}</div>
-                    <div><strong>Emirates ID:</strong> ${patient.emiratesId}</div>
-                    <div><strong>Name:</strong> ${patient.name}</div>
-                    <div><strong>Phone:</strong> ${patient.phone}</div>
-                    <div><strong>Package:</strong> ${patient.package}</div>
-                    <div><strong>Total Sessions:</strong> ${patient.totalSessions}</div>
-                    <div><strong>Sessions Completed:</strong> ${patient.sessionsCompleted}</div>
-                    <div><strong>Sessions Remaining:</strong> ${sessionsRemaining}</div>
-                    <div><strong>Package Price:</strong> ${patient.packagePrice?.toLocaleString() || patient.amountPaid.toLocaleString()} AED</div>
-                    <div><strong>Amount Paid:</strong> ${patient.amountPaid.toLocaleString()} AED</div>
-                    <div><strong>Extra Sessions:</strong> ${patient.extraSessions}</div>
-                    <div><strong>Extra Cost:</strong> ${patient.extraSessionCost.toLocaleString()} AED</div>
-                    <div><strong>Registration Date:</strong> ${patient.registrationDate}</div>
-                    <div><strong>Package Start Date:</strong> ${patient.packageStartDate || 'N/A'}</div>
-                    <div><strong>Package End Date:</strong> ${patient.packageEndDate || 'N/A'}</div>
-                    <div><strong>Last Visit:</strong> ${patient.lastVisit || 'N/A'}</div>
-                    <div><strong>Status:</strong> <span class="badge badge-${patient.status.toLowerCase()}">${patient.status}</span></div>
+                    <div><strong>File Number:</strong> ${sanitizeHTML(patient.fileNumber)}</div>
+                    <div><strong>Emirates ID:</strong> ${sanitizeHTML(patient.emiratesId)}</div>
+                    <div><strong>Name:</strong> ${sanitizeHTML(patient.name)}</div>
+                    <div><strong>Phone:</strong> ${sanitizeHTML(patient.phone)}</div>
+                    <div><strong>Package:</strong> ${sanitizeHTML(patient.package)}</div>
+                    <div><strong>Total Sessions:</strong> ${parseInt(patient.totalSessions)}</div>
+                    <div><strong>Sessions Completed:</strong> ${parseInt(patient.sessionsCompleted)}</div>
+                    <div><strong>Sessions Remaining:</strong> ${parseInt(sessionsRemaining)}</div>
+                    <div><strong>Package Price:</strong> ${parseFloat(patient.packagePrice || patient.amountPaid).toLocaleString()} AED</div>
+                    <div><strong>Amount Paid:</strong> ${parseFloat(patient.amountPaid).toLocaleString()} AED</div>
+                    <div><strong>Extra Sessions:</strong> ${parseInt(patient.extraSessions)}</div>
+                    <div><strong>Extra Cost:</strong> ${parseFloat(patient.extraSessionCost).toLocaleString()} AED</div>
+                    <div><strong>Registration Date:</strong> ${sanitizeHTML(patient.registrationDate)}</div>
+                    <div><strong>Package Start Date:</strong> ${sanitizeHTML(patient.packageStartDate || 'N/A')}</div>
+                    <div><strong>Package End Date:</strong> ${sanitizeHTML(patient.packageEndDate || 'N/A')}</div>
+                    <div><strong>Last Visit:</strong> ${sanitizeHTML(patient.lastVisit || 'N/A')}</div>
+                    <div><strong>Status:</strong> <span class="badge badge-${sanitizeHTML(patient.status).toLowerCase()}">${sanitizeHTML(patient.status)}</span></div>
                 </div>
-                
+
                 ${paymentStatusHTML}
-                
+
                 <div style="margin-top: 20px;">
                     <strong>Progress:</strong>
                     <div class="progress-container">
                         <div class="progress-bar">
-                            <div class="progress-fill" style="width: ${progress}%"></div>
+                            <div class="progress-fill" style="width: ${parseInt(progress)}%"></div>
                         </div>
-                        <div class="progress-text">${patient.sessionsCompleted}/${patient.totalSessions} sessions (${progress}%)</div>
+                        <div class="progress-text">${parseInt(patient.sessionsCompleted)}/${parseInt(patient.totalSessions)} sessions (${parseInt(progress)}%)</div>
                     </div>
                 </div>
 
                 ${paymentHistoryHTML}
 
-                ${patient.notes ? `<div style="margin-top: 20px;"><strong>Notes:</strong><br>${patient.notes}</div>` : ''}
+                ${patient.notes ? `<div style="margin-top: 20px;"><strong>Notes:</strong><br>${sanitizeHTML(patient.notes)}</div>` : ''}
 
                 ${patientVisits.length > 0 ? `
                     <div style="margin-top: 20px;">
@@ -3444,17 +3747,16 @@ ${description ? '<div class="row"><span>Description:</span><span>' + description
                                 </tr>
                             </thead>
                             <tbody>
-                                ${patientVisits.map(v => {
+                                ${patientVisits.map((v, visitIdx) => {
                                     const paymentAmount = v.installmentCollected || v.amount || 0;
-                                    const paymentType = v.extraSession === 'Yes' ? 'Extra Session' : 'Installment Payment';
-                                    const desc = v.extraSession === 'Yes' ? 'Extra Session' : 'Session ' + v.sessionNumber + ' of ' + patient.totalSessions;
                                     const patIdx = patients.indexOf(patient);
+                                    // SECURITY: Sanitize all data and use safe function reference
                                     return `<tr>
-                                        <td>${v.date}</td>
-                                        <td>${v.sessionNumber}</td>
+                                        <td>${sanitizeHTML(v.date)}</td>
+                                        <td>${parseInt(v.sessionNumber)}</td>
                                         <td>${v.extraSession === 'Yes' ? 'Extra' : 'Regular'}</td>
-                                        <td>${paymentAmount.toLocaleString()} AED</td>
-                                        <td>${paymentAmount > 0 ? `<button class="btn btn-small btn-secondary" onclick="printPaymentInvoice(patients[${patIdx}], ${paymentAmount}, '${paymentType}', '${v.date}', '${desc}')" style="padding: 4px 10px; font-size: 0.8rem;">🖨️ Print</button>` : ''}</td>
+                                        <td>${parseFloat(paymentAmount).toLocaleString()} AED</td>
+                                        <td>${paymentAmount > 0 ? `<button class="btn btn-small btn-secondary" onclick="printPatientVisitInvoice(${parseInt(patIdx)}, ${parseInt(visitIdx)})" style="padding: 4px 10px; font-size: 0.8rem;">🖨️ Print</button>` : ''}</td>
                                     </tr>`;
                                 }).join('')}
                             </tbody>
@@ -3502,18 +3804,19 @@ ${description ? '<div class="row"><span>Description:</span><span>' + description
 
             visits.slice().reverse().forEach(visit => {
                 const tr = document.createElement('tr');
-                const visitType = visit.extraSession === 'Yes' ? 
-                    '<span class="badge badge-pending">Extra</span>' : 
+                const visitType = visit.extraSession === 'Yes' ?
+                    '<span class="badge badge-pending">Extra</span>' :
                     '<span class="badge badge-active">Regular</span>';
-                
+
+                // SECURITY: Sanitize all visit data
                 tr.innerHTML = `
-                    <td>${visit.date}</td>
-                    <td>${visit.fileNumber}</td>
-                    <td>${visit.patientName}</td>
-                    <td>${visit.sessionNumber}</td>
+                    <td>${sanitizeHTML(visit.date)}</td>
+                    <td>${sanitizeHTML(visit.fileNumber)}</td>
+                    <td>${sanitizeHTML(visit.patientName)}</td>
+                    <td>${parseInt(visit.sessionNumber)}</td>
                     <td>${visitType}</td>
-                    <td>${(visit.amount || visit.installmentCollected || 0)} AED</td>
-                    <td>${visit.technician || 'N/A'}</td>
+                    <td>${parseFloat(visit.amount || visit.installmentCollected || 0).toLocaleString()} AED</td>
+                    <td>${sanitizeHTML(visit.technician || 'N/A')}</td>
                 `;
                 tbody.appendChild(tr);
             });
@@ -3522,20 +3825,22 @@ ${description ? '<div class="row"><span>Description:</span><span>' + description
         function displayPackages() {
             const tbody = document.getElementById('packagesTableBody');
             tbody.innerHTML = '';
-            
+
             packages.forEach((pkg, index) => {
                 const tr = document.createElement('tr');
-                const pricePerSession = (pkg.price / pkg.sessions).toFixed(2);
+                const pricePerSession = (parseFloat(pkg.price) / parseInt(pkg.sessions)).toFixed(2);
+
+                // SECURITY: Sanitize all package data
                 tr.innerHTML = `
-                    <td>${pkg.name}</td>
-                    <td>${pkg.area}</td>
-                    <td>${pkg.sessions}</td>
-                    <td>${pkg.price.toLocaleString()} AED</td>
+                    <td>${sanitizeHTML(pkg.name)}</td>
+                    <td>${sanitizeHTML(pkg.area)}</td>
+                    <td>${parseInt(pkg.sessions)}</td>
+                    <td>${parseFloat(pkg.price).toLocaleString()} AED</td>
                     <td>${pricePerSession} AED</td>
                     <td>
                         <div class="actions">
-                            <button class="action-btn edit-btn" onclick="requestEditPackage(${index})">Edit</button>
-                            <button class="action-btn delete-btn" onclick="requestDeletePackage(${index})">Delete</button>
+                            <button class="action-btn edit-btn" onclick="requestEditPackage(${parseInt(index)})">Edit</button>
+                            <button class="action-btn delete-btn" onclick="requestDeletePackage(${parseInt(index)})">Delete</button>
                         </div>
                     </td>
                 `;
@@ -3854,6 +4159,275 @@ ${description ? '<div class="row"><span>Description:</span><span>' + description
             }
         }
 
+        // ==================== ACTIVITY LOG FUNCTIONS ====================
+
+        let activityLogs = [];
+        let filteredActivityLogs = [];
+        let activityLogCurrentPage = 1;
+        const activityLogsPerPage = 50;
+
+        // Load activity logs from Firebase
+        function loadActivityLogs() {
+            if (!currentUser || (currentUser.role !== 'owner' && currentUser.role !== 'manager')) {
+                const tbody = document.getElementById('activityLogTableBody');
+                if (tbody) {
+                    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 20px; color: var(--danger);">⚠️ Access Denied: Only owners and managers can view the activity log.</td></tr>';
+                }
+                return;
+            }
+
+            if (!isFirebaseConfigured || !database) {
+                showToast('Activity log requires Firebase configuration.', 'warning');
+                return;
+            }
+
+            // Load all audit logs from Firebase
+            database.ref('auditLogs').orderByChild('timestamp').limitToLast(1000).once('value', (snapshot) => {
+                activityLogs = [];
+                snapshot.forEach((childSnapshot) => {
+                    const log = childSnapshot.val();
+                    log.id = childSnapshot.key;
+                    activityLogs.push(log);
+                });
+
+                // Sort by timestamp descending (newest first)
+                activityLogs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+                // Populate user filter dropdown
+                populateActivityUserFilter();
+
+                // Apply filters and render
+                filterActivityLog();
+
+                showToast(`✅ Loaded ${activityLogs.length} activity log entries`, 'success', 2000);
+            }).catch((error) => {
+                console.error('Error loading activity logs:', error);
+                showToast('Failed to load activity logs. Check Firebase permissions.', 'error');
+            });
+        }
+
+        // Populate user filter dropdown with unique users from logs
+        function populateActivityUserFilter() {
+            const userFilter = document.getElementById('activityUserFilter');
+            if (!userFilter) return;
+
+            const uniqueUsers = [...new Set(activityLogs.map(log => log.user))].filter(Boolean).sort();
+
+            userFilter.innerHTML = '<option value="">All Users</option>';
+            uniqueUsers.forEach(user => {
+                const option = document.createElement('option');
+                option.value = user;
+                option.textContent = user;
+                userFilter.appendChild(option);
+            });
+        }
+
+        // Filter activity logs based on search and filters
+        function filterActivityLog() {
+            const searchTerm = document.getElementById('activityLogSearch')?.value.toLowerCase() || '';
+            const actionFilter = document.getElementById('activityActionFilter')?.value || '';
+            const userFilter = document.getElementById('activityUserFilter')?.value || '';
+            const dateRange = document.getElementById('activityDateRange')?.value || 'all';
+
+            // Calculate date range
+            let startDate = null;
+            const now = new Date();
+            if (dateRange === 'today') {
+                startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            } else if (dateRange === 'week') {
+                startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            } else if (dateRange === 'month') {
+                startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+            }
+
+            filteredActivityLogs = activityLogs.filter(log => {
+                // Search filter
+                const searchMatch = !searchTerm ||
+                    log.user?.toLowerCase().includes(searchTerm) ||
+                    log.action?.toLowerCase().includes(searchTerm) ||
+                    JSON.stringify(log.details).toLowerCase().includes(searchTerm);
+
+                // Action filter
+                const actionMatch = !actionFilter || log.action?.includes(actionFilter);
+
+                // User filter
+                const userMatch = !userFilter || log.user === userFilter;
+
+                // Date filter
+                const dateMatch = !startDate || new Date(log.timestamp) >= startDate;
+
+                return searchMatch && actionMatch && userMatch && dateMatch;
+            });
+
+            activityLogCurrentPage = 1;
+            renderActivityLog();
+        }
+
+        // Render activity log table
+        function renderActivityLog() {
+            const tbody = document.getElementById('activityLogTableBody');
+            if (!tbody) return;
+
+            if (filteredActivityLogs.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 20px; color: var(--text-light);">No activity logs found matching the filters.</td></tr>';
+                updateActivityLogPagination(0, 0);
+                return;
+            }
+
+            // Pagination
+            const startIndex = (activityLogCurrentPage - 1) * activityLogsPerPage;
+            const endIndex = Math.min(startIndex + activityLogsPerPage, filteredActivityLogs.length);
+            const paginatedLogs = filteredActivityLogs.slice(startIndex, endIndex);
+
+            tbody.innerHTML = '';
+
+            paginatedLogs.forEach(log => {
+                const tr = document.createElement('tr');
+
+                // Format timestamp
+                const timestamp = new Date(log.timestamp);
+                const formattedTime = timestamp.toLocaleString('en-GB', {
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                });
+
+                // Format details
+                let detailsHTML = '';
+                if (log.details && typeof log.details === 'object') {
+                    detailsHTML = Object.entries(log.details)
+                        .map(([key, value]) => `<div style="font-size: 0.85rem;"><strong>${sanitizeHTML(key)}:</strong> ${sanitizeHTML(String(value))}</div>`)
+                        .join('');
+                } else {
+                    detailsHTML = sanitizeHTML(String(log.details || '-'));
+                }
+
+                // Format action with badge
+                const actionBadgeColor = getActionBadgeColor(log.action);
+                const actionHTML = `<span class="badge" style="background: ${actionBadgeColor};">${sanitizeHTML(log.action)}</span>`;
+
+                // Extract device info
+                const deviceInfo = log.userAgent ? log.userAgent.substring(0, 50) + '...' : 'Unknown';
+
+                tr.innerHTML = `
+                    <td>${sanitizeHTML(formattedTime)}</td>
+                    <td>${sanitizeHTML(log.user || 'System')}</td>
+                    <td><span class="badge badge-${sanitizeHTML(log.role || 'staff').toLowerCase()}">${sanitizeHTML(log.role || '-')}</span></td>
+                    <td>${actionHTML}</td>
+                    <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis;">${detailsHTML}</td>
+                    <td style="font-size: 0.8rem; color: var(--text-light);">${sanitizeHTML(deviceInfo)}</td>
+                `;
+
+                tbody.appendChild(tr);
+            });
+
+            updateActivityLogPagination(filteredActivityLogs.length, endIndex - startIndex);
+        }
+
+        // Get badge color based on action type
+        function getActionBadgeColor(action) {
+            if (!action) return '#6c757d';
+            if (action.includes('DELETED') || action.includes('LOGOUT')) return '#dc3545';
+            if (action.includes('CREATED') || action.includes('ADDED') || action.includes('LOGIN')) return '#28a745';
+            if (action.includes('UPDATED') || action.includes('EDITED')) return '#ffc107';
+            if (action.includes('EXPORTED') || action.includes('VIEWED')) return '#17a2b8';
+            return '#6c757d';
+        }
+
+        // Update pagination controls
+        function updateActivityLogPagination(totalItems, currentItems) {
+            const totalPages = Math.ceil(totalItems / activityLogsPerPage);
+            const infoDiv = document.getElementById('activityLogInfo');
+            const controlsDiv = document.getElementById('activityLogPageControls');
+
+            if (infoDiv) {
+                infoDiv.textContent = `Showing ${currentItems} of ${totalItems} entries`;
+            }
+
+            if (controlsDiv) {
+                if (totalPages <= 1) {
+                    controlsDiv.innerHTML = '';
+                    return;
+                }
+
+                let html = '';
+                if (activityLogCurrentPage > 1) {
+                    html += `<button class="btn btn-small btn-secondary" onclick="changeActivityLogPage(${activityLogCurrentPage - 1})">← Previous</button> `;
+                }
+
+                html += `<span style="margin: 0 10px;">Page ${activityLogCurrentPage} of ${totalPages}</span>`;
+
+                if (activityLogCurrentPage < totalPages) {
+                    html += ` <button class="btn btn-small btn-secondary" onclick="changeActivityLogPage(${activityLogCurrentPage + 1})">Next →</button>`;
+                }
+
+                controlsDiv.innerHTML = html;
+            }
+        }
+
+        // Change activity log page
+        function changeActivityLogPage(page) {
+            activityLogCurrentPage = page;
+            renderActivityLog();
+        }
+
+        // Reset activity log filters
+        function resetActivityLogFilters() {
+            document.getElementById('activityLogSearch').value = '';
+            document.getElementById('activityActionFilter').value = '';
+            document.getElementById('activityUserFilter').value = '';
+            document.getElementById('activityDateRange').value = 'all';
+            filterActivityLog();
+        }
+
+        // Refresh activity log
+        function refreshActivityLog() {
+            showToast('Refreshing activity log...', 'info', 2000);
+            loadActivityLogs();
+        }
+
+        // Export activity log to CSV
+        function exportActivityLog() {
+            if (!currentUser || (currentUser.role !== 'owner' && currentUser.role !== 'manager')) {
+                showToast('Only owners and managers can export activity logs.', 'error');
+                return;
+            }
+
+            if (filteredActivityLogs.length === 0) {
+                showToast('No activity logs to export.', 'warning');
+                return;
+            }
+
+            // Create CSV content
+            let csv = 'Timestamp,User,Role,Action,Details,Device/UserAgent\n';
+
+            filteredActivityLogs.forEach(log => {
+                const timestamp = new Date(log.timestamp).toLocaleString('en-GB');
+                const user = (log.user || 'System').replace(/"/g, '""');
+                const role = (log.role || '-').replace(/"/g, '""');
+                const action = (log.action || '-').replace(/"/g, '""');
+                const details = JSON.stringify(log.details || {}).replace(/"/g, '""');
+                const device = (log.userAgent || 'Unknown').replace(/"/g, '""');
+
+                csv += `"${timestamp}","${user}","${role}","${action}","${details}","${device}"\n`;
+            });
+
+            // Create download
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Noubel_ActivityLog_${new Date().toISOString().split('T')[0]}.csv`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+
+            showToast(`✅ ${filteredActivityLogs.length} activity log entries exported successfully!`, 'success');
+            logAudit('ACTIVITY_LOG_EXPORTED', { recordCount: filteredActivityLogs.length });
+        }
+
         // Close modal when clicking outside
         function printPaymentInvoiceForHistory(patientIndex, paymentIndex) {
             const p = patients[patientIndex];
@@ -3861,6 +4435,22 @@ ${description ? '<div class="row"><span>Description:</span><span>' + description
             if (p && payment) {
                 printPaymentInvoice(p, payment.amount, payment.type, payment.date, '');
             }
+        }
+
+        // SECURITY: Safe function to print visit invoice - prevents injection attacks
+        function printPatientVisitInvoice(patientIndex, visitIndex) {
+            const patient = patients[patientIndex];
+            if (!patient) return;
+
+            const patientVisits = visits.filter(v => v.patientIndex === patientIndex);
+            const visit = patientVisits[visitIndex];
+            if (!visit) return;
+
+            const paymentAmount = visit.installmentCollected || visit.amount || 0;
+            const paymentType = visit.extraSession === 'Yes' ? 'Extra Session' : 'Installment Payment';
+            const desc = visit.extraSession === 'Yes' ? 'Extra Session' : `Session ${visit.sessionNumber} of ${patient.totalSessions}`;
+
+            printPaymentInvoice(patient, paymentAmount, paymentType, visit.date, desc);
         }
 
         window.onclick = function(event) {
