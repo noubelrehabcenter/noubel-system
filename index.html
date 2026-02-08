@@ -1079,6 +1079,14 @@
                     <div class="card-header">
                         <h3 class="card-title" style="font-size: 1.2rem;" id="userFormTitle">Add New User</h3>
                     </div>
+                    <div style="background: #e7f3ff; padding: 12px 15px; border-radius: 6px; margin-bottom: 15px; font-size: 0.9rem; border-left: 3px solid var(--primary);">
+                        ℹ️ <strong>Note:</strong> Creating a user here will automatically:
+                        <ul style="margin: 5px 0 0 20px;">
+                            <li>Create their Firebase Authentication account</li>
+                            <li>Set their role and permissions in the database</li>
+                            <li>Send them login credentials (email + password you set)</li>
+                        </ul>
+                    </div>
                     <form id="userForm" onsubmit="saveUser(event)">
                         <div class="form-grid">
                             <div class="form-group">
@@ -1595,7 +1603,7 @@
         const firebaseConfig = {
         apiKey: "AIzaSyCjdNkGh--m_l4L1NGg2uqJpUt9TaGQo_w",
         authDomain: "noubel-medical-centre-laser.firebaseapp.com",
-        databaseURL: "https://noubel-medical-centre-laser-default-rtdb.europe-west1.firebasedatabase.app/",
+        databaseURL: "https://noubel-medical-centre-laser-default-rtdb.europe-west1.firebasedatabase.app",
         projectId: "noubel-medical-centre-laser",
         storageBucket: "noubel-medical-centre-laser.firebasestorage.app",
         messagingSenderId: "963512209927",
@@ -1605,6 +1613,7 @@
         // Initialize Firebase
         let database;
         let auth;
+        let secondaryApp; // For creating users without logging out current user
         let isFirebaseConfigured = false;
 
         try {
@@ -1612,6 +1621,10 @@
                 firebase.initializeApp(firebaseConfig);
                 auth = firebase.auth();
                 database = firebase.database();
+
+                // Initialize secondary app for user creation
+                secondaryApp = firebase.initializeApp(firebaseConfig, 'secondary');
+
                 isFirebaseConfigured = true;
                 console.log("✅ Firebase connected successfully - Cloud sync enabled!");
             } else {
@@ -2137,30 +2150,56 @@
 
             if (editingIndex === null) {
                 if (users.some(u => u && u.email === email)) {
-                    alert('A user with this email already exists in roles.');
+                    showToast('A user with this email already exists.', 'error');
                     return;
                 }
 
-                // Create auth user first, then store role information
-                auth.createUserWithEmailAndPassword(email, password)
+                // Create auth user using secondary app (won't log out current user)
+                if (!secondaryApp) {
+                    showToast('Secondary Firebase app not initialized. Cannot create users.', 'error');
+                    return;
+                }
+
+                showToast('Creating user account...', 'info', 2000);
+
+                secondaryApp.auth().createUserWithEmailAndPassword(email, password)
                     .then((cred) => {
                         const uid = cred.user.uid;
-                        users.push({
+
+                        // Immediately sign out from secondary app
+                        secondaryApp.auth().signOut();
+
+                        // Add user to database
+                        const newUser = {
                             uid,
                             email,
                             role,
                             accessLevel,
                             permissions
-                        });
+                        };
+
+                        users.push(newUser);
                         ensureOwnerUser();
                         persistUsers();
                         renderUsersTable();
                         resetUserForm();
-                        alert('User account created successfully.');
+
+                        showToast(`✅ User ${email} created successfully!`, 'success');
+                        logAudit('USER_CREATED', { email, role, by: currentUser.email });
                     })
                     .catch((error) => {
                         console.error('Error creating user:', error);
-                        alert(error.message || 'Failed to create user.');
+                        let errorMsg = 'Failed to create user.';
+
+                        if (error.code === 'auth/email-already-in-use') {
+                            errorMsg = 'This email is already registered in Firebase Authentication.';
+                        } else if (error.code === 'auth/weak-password') {
+                            errorMsg = 'Password should be at least 6 characters.';
+                        } else if (error.code === 'auth/invalid-email') {
+                            errorMsg = 'Invalid email address.';
+                        }
+
+                        showToast(errorMsg, 'error', 5000);
                     });
             } else {
                 const existing = users[editingIndex];
@@ -2258,9 +2297,16 @@
             });
 
             // CRITICAL FIX: Load users FIRST before setting up auth listener
+            // DEBUG: Test if we can read anything from security path
+            database.ref('security').once('value', (snapshot) => {
+                console.log('🔍 DEBUG: Reading entire security path:', snapshot.val());
+            });
+
             database.ref('security/users').once('value', (snapshot) => {
                 const data = snapshot.val();
                 console.log('📥 Loading users from Firebase:', data);
+                console.log('🔍 DEBUG: Snapshot exists?', snapshot.exists());
+                console.log('🔍 DEBUG: Snapshot key:', snapshot.key);
 
                 if (Array.isArray(data)) {
                     users = data;
