@@ -863,7 +863,7 @@
         <div class="header-content">
             <div class="header-logo">
                 <!-- Update the src path if you place the logo elsewhere in your project -->
-                <img src="Noubel logo.jpeg" alt="Noubel Rehabilitation Center logo">
+                <img src="assets/Noubel logo.jpeg" alt="Noubel Rehabilitation Center logo">
             </div>
             <div>
                 <h1>Noubel Medical Centre</h1>
@@ -928,7 +928,7 @@
             <button class="tab-btn" data-tab="extra-sessions" onclick="switchTab('extra-sessions', this)">➕ Extra Sessions</button>
             <button class="tab-btn" data-tab="history" onclick="switchTab('history', this)">📋 Visit History</button>
             <button class="tab-btn" data-tab="packages" onclick="switchTab('packages', this)">📦 Packages</button>
-            <button class="tab-btn" data-tab="security" onclick="switchTab('security', this)">👤 Users &amp; Access</button>
+            <button class="tab-btn" id="securityTabBtn" data-tab="security" onclick="switchTab('security', this)">👤 Users &amp; Access</button>
         </div>
 
         <!-- Dashboard Tab -->
@@ -1056,7 +1056,16 @@
                 <div class="card" style="margin-bottom: 20px;">
                     <div class="card-header">
                         <h3 class="card-title" style="font-size: 1.2rem;">Existing Users</h3>
+                        <button class="btn btn-success btn-small" onclick="exportUsers()">📥 Export Users</button>
                     </div>
+
+                    <!-- Search Users -->
+                    <div style="padding: 15px; background: #f8f9fa; border-bottom: 1px solid #dee2e6;">
+                        <input type="text" id="userSearchInput" placeholder="🔍 Search users by email or role..."
+                            style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 0.95rem;"
+                            oninput="filterUsers()">
+                    </div>
+
                     <div class="table-container">
                         <table>
                             <thead>
@@ -1381,6 +1390,7 @@
             <div class="card">
                 <div class="card-header">
                     <h2 class="card-title">All Visit History</h2>
+                    <button class="btn btn-success btn-small" onclick="exportVisitHistory()" data-permission="exportData">📥 Export Visits</button>
                 </div>
 
                 <div class="table-container">
@@ -2009,15 +2019,29 @@
 
         function applyUserPermissions() {
             const revenueCard = document.querySelector('[data-permission="viewRevenue"]');
-            const securityTabBtn = document.querySelector('.nav-tabs [data-tab="security"]');
+            const securityTabBtn = document.getElementById('securityTabBtn');
 
             if (revenueCard) {
                 revenueCard.style.display = hasPermission('viewRevenue') ? '' : 'none';
             }
 
-            // Always show the Users & Access tab in the nav,
-            // actual actions inside are still protected by permission checks.
-            // This avoids it disappearing if there is any mismatch while we debug.
+            // Hide export buttons for users without exportData permission
+            document.querySelectorAll('[data-permission="exportData"]').forEach(btn => {
+                btn.style.display = hasPermission('exportData') ? '' : 'none';
+            });
+
+            // Show Users & Access tab ONLY for owners and managers
+            if (securityTabBtn) {
+                const canAccessUserManagement = currentUser && (currentUser.role === 'owner' || currentUser.role === 'manager');
+                securityTabBtn.style.display = canAccessUserManagement ? '' : 'none';
+
+                // If user is on security tab and doesn't have access, switch to dashboard
+                const securityTab = document.getElementById('security');
+                if (!canAccessUserManagement && securityTab && securityTab.classList.contains('active')) {
+                    switchTab('dashboard');
+                }
+            }
+
             renderUsersTable();
         }
 
@@ -2255,26 +2279,49 @@
 
         function deleteUserAtIndex(index) {
             if (!currentUser || !hasPermission('manageUsers')) {
-                alert('You do not have permission to manage users.');
+                showToast('You do not have permission to manage users.', 'error');
                 return;
             }
 
             const user = users[index];
             if (!user) return;
+
             if (user.role === 'owner') {
-                alert('Owner accounts cannot be deleted from here. Create another owner and then change roles if needed.');
+                showToast('Owner accounts cannot be deleted. Create another owner first, then change roles if needed.', 'error', 6000);
                 return;
             }
 
-            if (!confirm(`Are you sure you want to delete user "${user.email || ''}"?`)) {
+            if (!confirm(`⚠️ DELETE USER: "${user.email}"\n\nThis will:\n✓ Remove user from database (immediate)\n✓ Block their access to the system (immediate)\n\n⚠️ IMPORTANT: You must also manually delete/disable their Firebase Authentication account:\n1. Go to Firebase Console\n2. Navigate to Authentication > Users\n3. Find and delete: ${user.email}\n\nContinue with database deletion?`)) {
                 return;
             }
-            
-            // Note: Deleting the Firebase Auth user itself must be done via Firebase console or secure backend.
+
+            const userEmail = user.email;
+            const userUid = user.uid;
+
+            // Remove from local array
             users.splice(index, 1);
+
+            // Persist to Firebase (this removes them from security/users)
             ensureOwnerUser();
             persistUsers();
             renderUsersTable();
+
+            // Log the deletion
+            logAudit('USER_DELETED', {
+                deletedUser: userEmail,
+                deletedUid: userUid,
+                by: currentUser.email
+            });
+
+            showToast(`✅ User "${userEmail}" removed from database. They will be logged out if currently online.`, 'success', 7000);
+
+            // Show reminder about Firebase Console
+            setTimeout(() => {
+                showToast(`⚠️ REMINDER: Delete "${userEmail}" from Firebase Console → Authentication → Users`, 'warning', 10000);
+            }, 3000);
+
+            // If the deleted user is currently logged in somewhere, they'll be forced to logout
+            // when they try to access anything (because updateCurrentUserRole won't find them)
         }
 
         // ==================== FIREBASE FUNCTIONS ====================
@@ -2393,19 +2440,34 @@
 
             console.log('✅ Found role entry:', roleEntry);
 
+            // SECURITY: If user is not found in the users database, they've been deleted
+            // Force logout to prevent access
+            if (!roleEntry) {
+                console.error('🚫 User not found in database - account may have been deleted. Forcing logout.');
+                showToast('Your account has been deleted or deactivated. Access denied.', 'error', 6000);
+
+                // Force logout after a brief delay to show the message
+                setTimeout(() => {
+                    if (auth && auth.currentUser) {
+                        auth.signOut().then(() => {
+                            currentUser = null;
+                            applyInitialUiState();
+                        });
+                    }
+                }, 2000);
+
+                return; // Exit early
+            }
+
             currentUser = {
                 uid: fbUser.uid,
                 email: fbUser.email,
-                role: roleEntry ? roleEntry.role : 'staff',
-                accessLevel: roleEntry ? roleEntry.accessLevel : 'low',
-                permissions: roleEntry ? roleEntry.permissions : getDefaultPermissionsForRole('staff')
+                role: roleEntry.role,
+                accessLevel: roleEntry.accessLevel,
+                permissions: roleEntry.permissions || getDefaultPermissionsForRole(roleEntry.role)
             };
 
             console.log('👤 Current user set to:', currentUser);
-
-            if (!roleEntry) {
-                console.warn('⚠️ No role found for user! Defaulting to staff. Check Firebase security/users structure.');
-            }
         }
 
         // Check auth state after users are loaded
@@ -3678,6 +3740,118 @@ ${description ? '<div class="row"><span>Description:</span><span>' + description
                 recordCount: patients.length,
                 exportFormat: 'CSV'
             });
+
+            showToast('✅ Patients data exported successfully!', 'success');
+        }
+
+        // Export Visit History to CSV
+        function exportVisitHistory() {
+            if (!currentUser || !hasPermission('exportData')) {
+                showToast('You do not have permission to export data.', 'error');
+                return;
+            }
+
+            if (!visits || visits.length === 0) {
+                showToast('No visit history to export.', 'warning');
+                return;
+            }
+
+            // Create CSV content
+            let csv = 'Date,File Number,Patient Name,Session Number,Visit Type,Amount (AED),Technician,Extra Session,Package,Area,Notes\n';
+
+            visits.forEach(visit => {
+                const visitType = visit.extraSession === 'Yes' ? 'Extra Session' : 'Regular Session';
+                const amount = visit.amount || visit.installmentCollected || 0;
+                const technician = visit.technician || 'N/A';
+                const notes = (visit.notes || '').replace(/"/g, '""'); // Escape quotes
+
+                csv += `"${visit.date}","${visit.fileNumber}","${visit.patientName}",${visit.sessionNumber},"${visitType}",${amount},"${technician}","${visit.extraSession || 'No'}","${visit.package || ''}","${visit.area || ''}","${notes}"\n`;
+            });
+
+            // Create download
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Noubel_VisitHistory_${new Date().toISOString().split('T')[0]}.csv`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+
+            // Log audit event
+            logAudit('VISITS_EXPORTED', {
+                recordCount: visits.length,
+                exportFormat: 'CSV'
+            });
+
+            showToast(`✅ ${visits.length} visit records exported successfully!`, 'success');
+        }
+
+        // Export Users to CSV
+        function exportUsers() {
+            if (!currentUser || (currentUser.role !== 'owner' && currentUser.role !== 'manager')) {
+                showToast('Only owners and managers can export user data.', 'error');
+                return;
+            }
+
+            if (!users || users.length === 0) {
+                showToast('No users to export.', 'warning');
+                return;
+            }
+
+            // Create CSV content
+            let csv = 'Email,Role,Access Level,Can View Revenue,Can Export Data,Can View Payments,Can Manage Patients,Can Delete Patients,Can Manage Packages,Can Delete Packages,Can Manage Users,UID\n';
+
+            users.forEach(user => {
+                if (!user) return;
+                const perms = user.permissions || {};
+
+                csv += `"${user.email || user.uid}","${user.role}","${user.accessLevel}",`;
+                csv += `${perms.viewRevenue ? 'Yes' : 'No'},`;
+                csv += `${perms.exportData ? 'Yes' : 'No'},`;
+                csv += `${perms.viewPayments ? 'Yes' : 'No'},`;
+                csv += `${perms.managePatients ? 'Yes' : 'No'},`;
+                csv += `${perms.deletePatients ? 'Yes' : 'No'},`;
+                csv += `${perms.managePackages ? 'Yes' : 'No'},`;
+                csv += `${perms.deletePackages ? 'Yes' : 'No'},`;
+                csv += `${perms.manageUsers ? 'Yes' : 'No'},`;
+                csv += `"${user.uid}"\n`;
+            });
+
+            // Create download
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Noubel_Users_${new Date().toISOString().split('T')[0]}.csv`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+
+            // Log audit event
+            logAudit('USERS_EXPORTED', {
+                recordCount: users.length,
+                exportFormat: 'CSV'
+            });
+
+            showToast(`✅ ${users.length} user records exported successfully!`, 'success');
+        }
+
+        // Filter users by search input
+        function filterUsers() {
+            const searchTerm = document.getElementById('userSearchInput').value.toLowerCase();
+            const tbody = document.getElementById('usersTableBody');
+            const rows = tbody.getElementsByTagName('tr');
+
+            for (let i = 0; i < rows.length; i++) {
+                const row = rows[i];
+                const email = row.cells[0]?.textContent.toLowerCase() || '';
+                const role = row.cells[1]?.textContent.toLowerCase() || '';
+
+                if (email.includes(searchTerm) || role.includes(searchTerm)) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            }
         }
 
         // Close modal when clicking outside
